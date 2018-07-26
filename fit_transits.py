@@ -36,7 +36,7 @@ ap.add_argument('-pn', '--planet_name', type=str, required=True, help='Either th
 ap.add_argument('-m', '--method', type=str, required=True, help='Select self-calibration method: [BLISS, KRDATA, PLD]')
 ap.add_argument('-xb', '--xbinsize', type=float, required=False, default=0.1 , help='Stepsize in X-sigma to space the knots')
 ap.add_argument('-yb', '--ybinsize', type=float, required=False, default=0.1 , help='Stepsize in Y-sigma to space the knots')
-ap.add_argument('-mcmc', '--mcmc', type=bool, required=False, default=False , help='Wether or not to do emcee routine.')
+ap.add_argument('-mcmc', '--mcmc', type=str, required=True , help='Wether or not to do emcee routine.')
 
 args = vars(ap.parse_args())
 
@@ -46,7 +46,7 @@ method = args['method']
 x_bin_size = args['xbinsize']
 y_bin_size = args['ybinsize']
 do_mcmc = args['mcmc']
-
+print(do_mcmc)
 #dataDir = '../GJ1214b_TSO/data/cat_transits.joblib.save'
 #dataDir = '../GJ1214b_TSO/data/GJ1214b_group0_ExoplanetTSO_transit1.joblib.save'
 #planet_name = '../GJ1214b_TSO/data/gj1214b_planet_params.json'
