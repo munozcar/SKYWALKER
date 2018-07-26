@@ -46,7 +46,6 @@ method = args['method']
 x_bin_size = args['xbinsize']
 y_bin_size = args['ybinsize']
 do_mcmc = args['mcmc']
-print(do_mcmc)
 #dataDir = '../GJ1214b_TSO/data/cat_transits.joblib.save'
 #dataDir = '../GJ1214b_TSO/data/GJ1214b_group0_ExoplanetTSO_transit1.joblib.save'
 #planet_name = '../GJ1214b_TSO/data/gj1214b_planet_params.json'
