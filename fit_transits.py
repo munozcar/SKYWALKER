@@ -16,6 +16,7 @@ from scipy import spatial
 from statsmodels.robust import scale
 from time import time
 # SYNOD methods and assisting routines:
+
 import synod
 import utils
 import models
