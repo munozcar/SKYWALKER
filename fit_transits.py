@@ -252,7 +252,7 @@ if do_mcmc == True:
 
 plt.subplot2grid ((2,1),(0,0))
 plt.scatter(times, fluxes,  s=0.5, color='black', alpha=1)
-plt.scatter(times, bf_full_model/np.median(bf_full_model), color='red', s=0.5)
+plt.scatter(times, bf_full_model, color='red', s=0.5)
 plt.subplot2grid ((2,1),(1,0))
-plt.scatter(times, fluxes-bf_full_model/np.median(bf_full_model), s=0.5, color='blue')
+plt.scatter(times, fluxes-bf_full_model, s=0.5, color='blue')
 plt.show()
