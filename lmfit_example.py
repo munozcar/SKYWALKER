@@ -35,6 +35,8 @@ ap.add_argument('-pn', '--planet_name', type=str, required=True, help='Either th
 ap.add_argument('-m', '--method', type=str, required=True, help='Select self-calibration method: [BLISS, KRDATA, PLD]')
 ap.add_argument('-xb', '--xbinsize', type=float, required=False, default=0.1 , help='Stepsize in X-sigma to space the knots')
 ap.add_argument('-yb', '--ybinsize', type=float, required=False, default=0.1 , help='Stepsize in Y-sigma to space the knots')
+ap.add_argument('-mcmc', '--mcmc', type=bool, required=False, default=False , help='Wether or not to do emcee routine.')
+
 args = vars(ap.parse_args())
 
 dataDir = args['filename']
@@ -42,6 +44,7 @@ planet_name = args['planet_name']
 method = args['method']
 x_bin_size = args['xbinsize']
 y_bin_size = args['ybinsize']
+do_mcmc = args['mcmc']
 
 #dataDir = '../GJ1214b_TSO/data/cat_transits.joblib.save'
 #dataDir = '../GJ1214b_TSO/data/GJ1214b_group0_ExoplanetTSO_transit1.joblib.save'
@@ -197,6 +200,55 @@ bf_transit_model = bf_model_set['transit_model']
 bf_sensitivity_map = bf_model_set['sensitivity_map']
 
 nSig = 10
+
+if do_mcmc == True:
+    print('Setting MCMC up.')
+    mle0.params.add('f', value=1, min=0.001, max=2)
+    
+    def logprior_func(p):
+        return 0
+    
+    def lnprob(p):
+        logprior = logprior_func(p)
+        if not np.isfinite(logprior):
+            return -np.inf
+        
+        resid = partial_residuals(p)
+        s = p['f']
+        resid *= 1 / s
+        resid *= resid
+        resid += np.log(2 * np.pi * s**2)
+        return -0.5 * np.sum(resid) + logprior
+    
+    
+    mini  = Minimizer(lnprob, mle0.params)
+    
+    start = time()
+    
+    #import emcee
+    #res = emcee.sampler(lnlikelihood = lnprob, lnprior=logprior_func)
+    print('MCMC routine in progress...')
+    res   = mini.emcee(params=mle0.params, steps=100, nwalkers=100, burn=1, thin=10, ntemps=1,
+                       pos=None, reuse_sampler=False, workers=1, float_behavior='posterior',
+                       is_weighted=True, seed=None)
+        
+                       #
+    print("MCMC operation took {} seconds".format(time()-start))
+                    
+    joblib.dump(res,'emcee.joblib.save')
+    # corner_use    = [1, 4,5,]
+    res_var_names = np.array(res.var_names)
+    res_flatchain = np.array(res.flatchain)
+    res_df = DataFrame(res_flatchain, columns=res_var_names)
+    res_df = res_df.drop(['u2','slope'], axis=1)
+    print(res_df)
+    # res_flatchain.T[corner_use].shape
+    corner_kw = dict(levels=[0.68, 0.95, 0.997], plot_datapoints=False, smooth=True, bins=30)
+                       
+    corner.corner(res_df, color='darkblue', **corner_kw, range=[(54945,54990),(0.01357,0.01385),(0.1097,0.11035),(0.996,1.002), (0.998,1.003)], plot_density=False, fill_contours=True)
+                       
+    plt.show()
+
 
 plt.subplot2grid ((2,1),(0,0))
 plt.scatter(times, fluxes,  s=0.5, color='black', alpha=1)
