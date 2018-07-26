@@ -170,5 +170,5 @@ def add_line_params(model_params, phase, times, transitType='primary'):
 def add_pld_params(model_params):
     n_pld = 9
     for k in range(n_pld):
-        model_params.add_many(('pld{}'.format(k), 1, True))
+        model_params.add_many(('pld{}'.format(k), True))
     return model_params

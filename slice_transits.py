@@ -154,7 +154,7 @@ for kt in range(ntransits):
     intensities = []
     for pixel in pld_intensities:
         intensities.append(np.array(pixel[idx_start:idx_end]))
-        
+
     current_transit[pld_coeff_key] = np.array(intensities)
     current_transit[xcenter_key] = xcenters[idx_start:idx_end]
     current_transit[ycenter_key] = ycenters[idx_start:idx_end]

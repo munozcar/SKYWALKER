@@ -123,7 +123,6 @@ if method.lower() == 'pld':
 flux_errs = flux_errs/np.median(fluxes)
 fluxes = fluxes/np.median(fluxes)
 
-
 print('Fixing Time Stamps')
 len_init_t0 = len(str(int(init_t0)))
 len_times = len(str(int(times.mean())))
@@ -148,8 +147,8 @@ initialParams.add_many(
     ('deltaEc'  , 0.00005    , False  ,-0.05, 0.05),
     ('inc'      , init_inc   , False, 80.0, 90.),
     ('aprs'     , init_aprs  , False, 0.0, 100.),
-    ('tdepth'   , init_tdepth, True , 0.0, 0.3 ),
-    ('edepth'   , init_fpfs  , False, 0.0, 0.1),
+    ('tdepth'   , init_tdepth, False , 0.0, 0.3 ),
+    ('edepth'   , init_fpfs  , True, 0.0, 0.1),
     ('ecc'      , init_ecc   , False, 0.0, 1.0 ),
     ('omega'    , init_omega , False, 0.0, 1.0 ),
     ('u1'       , init_u1    , True , 0.0, 1.0 ),
@@ -204,37 +203,37 @@ nSig = 10
 if do_mcmc == True:
     print('Setting MCMC up.')
     mle0.params.add('f', value=1, min=0.001, max=2)
-    
+
     def logprior_func(p):
         return 0
-    
+
     def lnprob(p):
         logprior = logprior_func(p)
         if not np.isfinite(logprior):
             return -np.inf
-        
+
         resid = partial_residuals(p)
         s = p['f']
         resid *= 1 / s
         resid *= resid
         resid += np.log(2 * np.pi * s**2)
         return -0.5 * np.sum(resid) + logprior
-    
-    
+
+
     mini  = Minimizer(lnprob, mle0.params)
-    
+
     start = time()
-    
+
     #import emcee
     #res = emcee.sampler(lnlikelihood = lnprob, lnprior=logprior_func)
     print('MCMC routine in progress...')
     res   = mini.emcee(params=mle0.params, steps=100, nwalkers=100, burn=1, thin=10, ntemps=1,
                        pos=None, reuse_sampler=False, workers=1, float_behavior='posterior',
                        is_weighted=True, seed=None)
-        
+
                        #
     print("MCMC operation took {} seconds".format(time()-start))
-                    
+
     joblib.dump(res,'emcee.joblib.save')
     # corner_use    = [1, 4,5,]
     res_var_names = np.array(res.var_names)
@@ -244,15 +243,24 @@ if do_mcmc == True:
     print(res_df)
     # res_flatchain.T[corner_use].shape
     corner_kw = dict(levels=[0.68, 0.95, 0.997], plot_datapoints=False, smooth=True, bins=30)
-                       
+
     corner.corner(res_df, color='darkblue', **corner_kw, range=[(54945,54990),(0.01357,0.01385),(0.1097,0.11035),(0.996,1.002), (0.998,1.003)], plot_density=False, fill_contours=True)
-                       
+
     plt.show()
 
+times = utils.bin_data(times, 50)
+xcenters = utils.bin_data(xcenters, 50)
+ycenters = utils.bin_data(ycenters, 50)
+fluxes = utils.bin_data(fluxes, 50)
+flux_errs = utils.bin_data(flux_errs, 50)
+bf_full_model = utils.bin_data(bf_full_model, 50)
 
 plt.subplot2grid ((2,1),(0,0))
-plt.scatter(times, fluxes,  s=0.5, color='black', alpha=1)
-plt.scatter(times, bf_full_model, color='red', s=0.5)
+plt.plot(times, fluxes,  linewidth=1, color='black', alpha=1)
+plt.plot(times, bf_full_model, color='red', linewidth=1)
+plt.scatter(times, fluxes, color='black', s=1)
+plt.scatter(times, bf_full_model, color='red', s=1)
 plt.subplot2grid ((2,1),(1,0))
-plt.scatter(times, fluxes-bf_full_model, s=0.5, color='blue')
+plt.plot(times, fluxes-bf_full_model, linewidth=1, color='blue')
+plt.scatter(times, fluxes-bf_full_model, s=1, color='blue')
 plt.show()

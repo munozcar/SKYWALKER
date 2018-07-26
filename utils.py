@@ -95,8 +95,8 @@ def setup_inputs_from_file(dataDir, x_bin_size=0.1, y_bin_size=0.1, xSigmaRange=
     elif method.lower() == 'krdata':
         print('Setting up KRDATA')
         n_nbr   = 50
-        flux_errs_norm = flux_errs[keep_inds]/np.median(fluxes[keep_inds])
-        points  = np.transpose([xcenters[keep_inds], ycenters[keep_inds], flux_errs_norm])
+        #flux_errs_norm = flux_errs[keep_inds]/np.median(fluxes[keep_inds])
+        points  = np.transpose([xcenters[keep_inds], ycenters[keep_inds], npix[keep_inds]])
         kdtree  = spatial.cKDTree(points)
         ind_kdtree  = kdtree.query(kdtree.data, n_nbr)[1]
         gw_kdtree = kr.gaussian_weights_and_nearest_neighbors(  xpos=xcenters[keep_inds],
@@ -136,3 +136,12 @@ def compute_phase(times, t0, period):
     phase = ((times - t0) % period) / period
     phase[phase > 0.5] -= 1.0
     return phase
+
+def bin_data(data, bin_size):
+    binned = []
+    init = 0
+    num_bins = int(len(data)/bin_size)
+    for i in np.array(range(num_bins))+1:
+        binned.append(np.mean(data[init:i*bin_size]))
+        init = i*bin_size
+    return np.array(binned)
