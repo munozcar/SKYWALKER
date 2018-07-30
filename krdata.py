@@ -24,8 +24,9 @@ def find_qhull_one_point(point, x0, y0, np0, inds, kdtree=None):
         exponent  = -dx**2./(2.0*sigx**2.) + -dy**2./(2.*sigy**2.) + -dnp**2./(2.*signp**2.)
     else:
         exponent  = -dx**2./(2.0*sigx**2.) + -dy**2./(2.*sigy**2.)
-
     gw_temp = exp(exponent)
+    if gw_temp.sum() == 0:
+        return zeros(len(gw_temp))
     return gw_temp / gw_temp.sum()
 
 def gaussian_weights_and_nearest_neighbors(xpos, ypos, npix = None, inds = None, n_nbr = 50, returnInds=False, a = 1.0, b = 0.7, c = 1.0, expansion = 1000., nCores=1):
@@ -46,33 +47,33 @@ def gaussian_weights_and_nearest_neighbors(xpos, ypos, npix = None, inds = None,
             J. Fraine    first edition, direct translation from IDL 12.05.12
     '''
     #The surface fitting performs better if the data is scattered about zero
-    x0  = (xpos - median(xpos))/a
+    # x0  = (xpos - median(xpos))/a
     # x0 = x0/std(x0)
-    y0  = (ypos - median(ypos))/b
+    # y0  = (ypos - median(ypos))/b
     # y0 = y0/std(y0)
 #
-    if npix is not None and bool(c):
-        np0 = sqrt(npix)
-        np0 = (np0 - median(np0))/c
-        features  = transpose((y0, x0, np0))
-    else:
-        features  = transpose((y0, x0))
+    # if npix is not None and bool(c):
+    #     np0 = sqrt(npix)
+    #     np0 = (np0 - median(np0))/c
+    #     features  = transpose((y0, x0, np0))
+    # else:
+    #     features  = transpose((y0, x0))
 
-        if sum(np0) == 0.0:
-            print('SKIPPING Noise Pixel Sections of Gaussian Kernel because Noise Pixels are Zero')
-        if c == 0:
-            print('SKIPPING Noise Pixel Sections of Gaussian Kernel because c == 0')
+        # if sum(np0) == 0.0:
+        #     print('SKIPPING Noise Pixel Sections of Gaussian Kernel because Noise Pixels are Zero')
+        # if c == 0:
+        #     print('SKIPPING Noise Pixel Sections of Gaussian Kernel because c == 0')
 
-    if inds is None:
-        kdtree    = cKDTree(features * expansion) #Multiplying `features` by 1000.0 avoids precision problems
-        inds      = kdtree.query(kdtree.data, n_nbr+1)[1][:,1:]
-
-        print('WARNING: Because `inds` was not provided, we must now compute and return it here')
-        returnInds= True
+    # if inds is None:
+    #     kdtree    = cKDTree(features * expansion) #Multiplying `features` by 1000.0 avoids precision problems
+    #     inds      = kdtree.query(kdtree.data, n_nbr+1)[1][:,1:]
+    #
+    #     print('WARNING: Because `inds` was not provided, we must now compute and return it here')
+    #     returnInds= True
 
     n, k   = inds.shape                           # This is the number of nearest neighbors you want
 
-    func  = partial(find_qhull_one_point, x0=x0, y0=y0, np0=np0, inds=inds)
+    func  = partial(find_qhull_one_point, x0=xpos, y0=ypos, np0=npix, inds=inds)
 
     if nCores > 1:
         raise Exception('Check to make sure that Multiprocessing is working correctly -- examine the Activity Monitor.')

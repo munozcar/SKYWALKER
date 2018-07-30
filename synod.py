@@ -67,16 +67,14 @@ def generate_best_fit_solution(model_params, times, xcenters, ycenters, fluxes, 
     # compute the systematics model
     assert (method.lower() == 'bliss' or method.lower() == 'krdata' or method.lower() == 'pld'), "Invalid method."
     residuals = fluxes/model
-
     sensitivity_map = models.compute_sensitivity_map(model_params=model_params, method=method, xcenters=xcenters, ycenters=ycenters, residuals=residuals, knots=knots, nearIndices=nearIndices, xBinSize=x_bin_size, yBinSize=y_bin_size, ind_kdtree=ind_kdtree, gw_kdtree=gw_kdtree, pld_intensities=pld_intensities)
-
 
     model = model*sensitivity_map
 
     output = {}
     output['full_model'] = model
     output['line_model'] = line_model
-    output['transit_model'] = transit_model
+    output['transit_model'] = transit_model*eclipse_model
     output['sensitivity_map'] = sensitivity_map
     print('LOADING...')
     return output

@@ -147,8 +147,8 @@ initialParams.add_many(
     ('deltaEc'  , 0.00005    , False  ,-0.05, 0.05),
     ('inc'      , init_inc   , False, 80.0, 90.),
     ('aprs'     , init_aprs  , False, 0.0, 100.),
-    ('tdepth'   , init_tdepth, False , 0.0, 0.3 ),
-    ('edepth'   , init_fpfs  , True, 0.0, 0.1),
+    ('tdepth'   , init_tdepth, True , 0.0, 0.3 ),
+    ('edepth'   , init_fpfs  , False, 0.0, 0.1),
     ('ecc'      , init_ecc   , False, 0.0, 1.0 ),
     ('omega'    , init_omega , False, 0.0, 1.0 ),
     ('u1'       , init_u1    , True , 0.0, 1.0 ),
@@ -248,12 +248,38 @@ if do_mcmc == True:
 
     plt.show()
 
-times = utils.bin_data(times, 50)
-xcenters = utils.bin_data(xcenters, 50)
-ycenters = utils.bin_data(ycenters, 50)
-fluxes = utils.bin_data(fluxes, 50)
-flux_errs = utils.bin_data(flux_errs, 50)
-bf_full_model = utils.bin_data(bf_full_model, 50)
+
+
+
+# residuals = fluxes/bf_transit_model
+# rem = np.array([True if r < 1.05 and r > 0.95 else False for r in residuals])
+#
+# ax = plt.subplot2grid((2,2),(0,1), rowspan=2)
+# plt.scatter(xcenters[rem], ycenters[rem], c=residuals[rem], s=2, marker='o', cmap='jet')
+# plt.xlabel('x-centroid', fontsize=16)
+# plt.ylabel('y-centroid', fontsize=16)
+# plt.axhline(y=15.5, c='black')
+# plt.axvline(x=15.5, c='black')
+# plt.axhline(y=14.5, c='black')
+# plt.axvline(x=14.5, c='black')
+# plt.colorbar(orientation="vertical")
+# ax2 = plt.subplot2grid((2,2),(0,0))
+# plt.scatter(phase[rem], xcenters[rem], c=residuals[rem], s=1, marker='o', cmap='jet')
+# plt.ylabel('x-centroid', fontsize=16)
+# ax3 = plt.subplot2grid((2,2),(1,0))
+# plt.scatter(phase[rem], ycenters[rem], c=residuals[rem], s=1, marker='o', cmap='jet')
+# plt.xlabel('Phase', fontsize=16)
+# plt.ylabel('y-centroid', fontsize=16)
+# plt.show()
+
+times = utils.bin_data(times, 100)
+xcenters = utils.bin_data(xcenters, 100)
+ycenters = utils.bin_data(ycenters, 100)
+fluxes = utils.bin_data(fluxes, 100)
+flux_errs = utils.bin_data(flux_errs, 100)
+bf_full_model = utils.bin_data(bf_full_model, 100)
+bf_transit_model = utils.bin_data(bf_transit_model, 100)
+phase = utils.bin_data(phase, 100)
 
 plt.subplot2grid ((2,1),(0,0))
 plt.plot(times, fluxes,  linewidth=1, color='black', alpha=1)

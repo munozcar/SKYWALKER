@@ -62,19 +62,15 @@ def cat_transits(filearray):
     current_transit[xwidth_key] = cat_xwidths
     current_transit[ywidth_key] = cat_ywidths
 
-    joblib.dump(current_transit, 'cat_transits.joblib.save')
+    joblib.dump(current_transit, 'cat_all.joblib.save')
 
 
-filearray = ['../GJ1214b_TSO/data/GJ1214b_group0_ExoplanetTSO_transit0.joblib.save',
-'../GJ1214b_TSO/data/GJ1214b_group0_ExoplanetTSO_transit1.joblib.save',
-'../GJ1214b_TSO/data/GJ1214b_group1_ExoplanetTSO_transit0.joblib.save',
-'../GJ1214b_TSO/data/GJ1214b_group1_ExoplanetTSO_transit1.joblib.save', '../GJ1214b_TSO/data/GJ1214b_group2_ExoplanetTSO_transit0.joblib.save', '../GJ1214b_TSO/data/GJ1214b_group2_ExoplanetTSO_transit1.joblib.save',
-'../GJ1214b_TSO/data/GJ1214b_group3_ExoplanetTSO_transit0.joblib.save',
-'../GJ1214b_TSO/data/GJ1214b_group3_ExoplanetTSO_transit1.joblib.save',
-'../GJ1214b_TSO/data/GJ1214b_group4_ExoplanetTSO_transit0.joblib.save',
-'../GJ1214b_TSO/data/GJ1214b_group5_ExoplanetTSO_transit0.joblib.save',
-'../GJ1214b_TSO/data/GJ1214b_group5_ExoplanetTSO_transit1.joblib.save',
-'../GJ1214b_TSO/data/GJ1214b_group6_ExoplanetTSO_transit0.joblib.save',
-'../GJ1214b_TSO/data/GJ1214b_group6_ExoplanetTSO_transit1.joblib.save']
+filearray = ['../GJ1214b_TSO/data/GJ1214b_group0_ExoplanetTSO.joblib.save',
+'../GJ1214b_TSO/data/GJ1214b_group1_ExoplanetTSO.joblib.save',
+ '../GJ1214b_TSO/data/GJ1214b_group2_ExoplanetTSO.joblib.save',
+'../GJ1214b_TSO/data/GJ1214b_group3_ExoplanetTSO.joblib.save',
+'../GJ1214b_TSO/data/GJ1214b_group4_ExoplanetTSO.joblib.save',
+'../GJ1214b_TSO/data/GJ1214b_group5_ExoplanetTSO.joblib.save',
+'../GJ1214b_TSO/data/GJ1214b_group6_ExoplanetTSO.joblib.save']
 
 cat_transits(filearray)

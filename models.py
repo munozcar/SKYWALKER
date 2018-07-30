@@ -5,6 +5,7 @@ import utils
 import krdata as kr
 from statsmodels.robust import scale
 import matplotlib.pyplot as plt
+import numpy.linalg as linear
 # Global constants.
 y,x = 0,1
 ppm = 1e6
@@ -50,7 +51,7 @@ def transit_model_func(model_params, times, init_t0=0.0, ldtype='quadratic', tra
     return m_eclipse.light_curve(bm_params)
 
 
-def line_model_func(model_params, ntransits, transit_indices, times):
+def line_model_func(model_params, ntransits, transit_indices, times, token=False):
     intercepts = []
     coeffs_line_list = []
 
@@ -138,7 +139,6 @@ def add_line_params(model_params, phase, times, transitType='primary'):
     print('Found {} transits'.format(ntransits))
     transit_indices = []
     idx_start = ph_transits[0]
-
     for kt in range(ntransits):
         idx_end = ph_transits[ph_where_transits[kt]]
         transit_indices.append([idx_start,idx_end+1])
@@ -170,5 +170,5 @@ def add_line_params(model_params, phase, times, transitType='primary'):
 def add_pld_params(model_params):
     n_pld = 9
     for k in range(n_pld):
-        model_params.add_many(('pld{}'.format(k), True))
+        model_params.add_many(('pld{}'.format(k), 1.1, True))
     return model_params

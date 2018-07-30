@@ -95,13 +95,20 @@ def setup_inputs_from_file(dataDir, x_bin_size=0.1, y_bin_size=0.1, xSigmaRange=
     elif method.lower() == 'krdata':
         print('Setting up KRDATA')
         n_nbr   = 50
-        #flux_errs_norm = flux_errs[keep_inds]/np.median(fluxes[keep_inds])
-        points  = np.transpose([xcenters[keep_inds], ycenters[keep_inds], npix[keep_inds]])
-        kdtree  = spatial.cKDTree(points)
-        ind_kdtree  = kdtree.query(kdtree.data, n_nbr)[1]
-        gw_kdtree = kr.gaussian_weights_and_nearest_neighbors(  xpos=xcenters[keep_inds],
-                                                                ypos=ycenters[keep_inds],
-                                                                npix=npix[keep_inds],
+        expansion = 1000
+
+        xpos = xcenters[keep_inds] - np.median(xcenters[keep_inds])
+        ypos = (ycenters[keep_inds] - np.median(ycenters[keep_inds]))/0.7
+        np0 = sqrt(npix[keep_inds])
+        np0 = (np0 - median(np0))
+
+        points  = np.transpose([xpos, ypos, np0])
+        kdtree  = spatial.cKDTree(points * expansion)
+
+        ind_kdtree  = kdtree.query(kdtree.data, n_nbr+1)[1][:,1:]
+        gw_kdtree = kr.gaussian_weights_and_nearest_neighbors(  xpos=xpos,
+                                                                ypos=ypos,
+                                                                npix=np0,
                                                                 inds=ind_kdtree )
         knots = None
         nearIndices = None
