@@ -46,6 +46,7 @@ method = args['method']
 x_bin_size = args['xbinsize']
 y_bin_size = args['ybinsize']
 do_mcmc = args['mcmc']
+print(do_mcmc)
 #dataDir = '../GJ1214b_TSO/data/cat_transits.joblib.save'
 #dataDir = '../GJ1214b_TSO/data/GJ1214b_group0_ExoplanetTSO_transit1.joblib.save'
 #planet_name = '../GJ1214b_TSO/data/gj1214b_planet_params.json'
@@ -161,7 +162,7 @@ initialParams, transit_indices = models.add_line_params(initialParams, phase=pha
 
 if method.lower() == 'pld':
     print('Initializing PLD coefficients.')
-    initialParams = models.add_pld_params(initialParams)
+    initialParams = models.add_pld_params(initialParams, fluxes=fluxes, pld_intensities=pld_intensities)
 
 partial_residuals  = partial(synod.residuals_func,
                              times       = times,
@@ -200,7 +201,7 @@ bf_sensitivity_map = bf_model_set['sensitivity_map']
 
 nSig = 10
 
-if do_mcmc == True:
+if do_mcmc == 'True':
     print('Setting MCMC up.')
     mle0.params.add('f', value=1, min=0.001, max=2)
 

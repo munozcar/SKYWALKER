@@ -80,7 +80,7 @@ def line_model_func(model_params, ntransits, transit_indices, times, token=False
 
     return np.array(total_line)
 
-def compute_sensitivity_map(model_params, method, xcenters, ycenters, residuals, knots, nearIndices, xBinSize, yBinSize, ind_kdtree, gw_kdtree, pld_intensities):
+def compute_sensitivity_map(model_params, method, xcenters, ycenters, residuals, knots, nearIndices, xBinSize, yBinSize, ind_kdtree, gw_kdtree, pld_intensities, model):
     if method == 'bliss' :
         normFactor = (1/xBinSize) * (1/yBinSize)
         sensitivity_map = bliss.BLISS(xcenters, ycenters, residuals, knots, nearIndices, xBinSize=xBinSize, yBinSize=xBinSize, normFactor=normFactor)
@@ -167,8 +167,9 @@ def add_line_params(model_params, phase, times, transitType='primary'):
 
     return model_params, transit_indices
 
-def add_pld_params(model_params):
-    n_pld = 9
+def add_pld_params(model_params, fluxes, pld_intensities, n_pld = 9):
+    pld_coeffs = np.linalg.lstsq(pld_intensities.T, fluxes)[0]
+    print(pld_coeffs)
     for k in range(n_pld):
-        model_params.add_many(('pld{}'.format(k), 1.1, True))
+        model_params.add_many(('pld{}'.format(k), pld_coeffs[k], True))
     return model_params
