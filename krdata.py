@@ -46,31 +46,6 @@ def gaussian_weights_and_nearest_neighbors(xpos, ypos, npix = None, inds = None,
         Python Version:
             J. Fraine    first edition, direct translation from IDL 12.05.12
     '''
-    #The surface fitting performs better if the data is scattered about zero
-    # x0  = (xpos - median(xpos))/a
-    # x0 = x0/std(x0)
-    # y0  = (ypos - median(ypos))/b
-    # y0 = y0/std(y0)
-#
-    # if npix is not None and bool(c):
-    #     np0 = sqrt(npix)
-    #     np0 = (np0 - median(np0))/c
-    #     features  = transpose((y0, x0, np0))
-    # else:
-    #     features  = transpose((y0, x0))
-
-        # if sum(np0) == 0.0:
-        #     print('SKIPPING Noise Pixel Sections of Gaussian Kernel because Noise Pixels are Zero')
-        # if c == 0:
-        #     print('SKIPPING Noise Pixel Sections of Gaussian Kernel because c == 0')
-
-    # if inds is None:
-    #     kdtree    = cKDTree(features * expansion) #Multiplying `features` by 1000.0 avoids precision problems
-    #     inds      = kdtree.query(kdtree.data, n_nbr+1)[1][:,1:]
-    #
-    #     print('WARNING: Because `inds` was not provided, we must now compute and return it here')
-    #     returnInds= True
-
     n, k   = inds.shape                           # This is the number of nearest neighbors you want
 
     func  = partial(find_qhull_one_point, x0=xpos, y0=ypos, np0=npix, inds=inds)

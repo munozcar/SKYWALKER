@@ -50,7 +50,7 @@ def residuals_func(model_params, times, xcenters, ycenters, fluxes, flux_errs, k
     sensitivity_map = models.compute_sensitivity_map(model_params=model_params, method=method, xcenters=xcenters,  ycenters=ycenters, residuals=residuals, knots=knots, nearIndices=nearIndices, xBinSize=x_bin_size, yBinSize=y_bin_size, ind_kdtree=ind_kdtree, gw_kdtree=gw_kdtree, pld_intensities=pld_intensities, model=model)
 
     model = model*sensitivity_map
-    return (model - fluxes) / flux_errs
+    return (model - fluxes) / flux_errs 
 
 def generate_best_fit_solution(model_params, times, xcenters, ycenters, fluxes, knots, keep_inds, method=None, nearIndices=None, ind_kdtree=None, gw_kdtree=None, pld_intensities=None, x_bin_size  = 0.1, y_bin_size  = 0.1, transit_indices=None):
 

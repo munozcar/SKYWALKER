@@ -94,7 +94,7 @@ def setup_inputs_from_file(dataDir, x_bin_size=0.1, y_bin_size=0.1, xSigmaRange=
         gw_kdtree = None
     elif method.lower() == 'krdata':
         print('Setting up KRDATA')
-        n_nbr   = 50
+        n_nbr   = 100
         expansion = 1000
 
         xpos = xcenters[keep_inds] - np.median(xcenters[keep_inds])

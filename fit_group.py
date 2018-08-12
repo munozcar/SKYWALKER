@@ -50,7 +50,6 @@ do_mcmc = args['mcmc']
 #dataDir = '../GJ1214b_TSO/data/GJ1214b_group0_ExoplanetTSO_transit1.joblib.save'
 #planet_name = '../GJ1214b_TSO/data/gj1214b_planet_params.json'
 
-transit_type='secondary'
 x_sigma_range = 4
 y_sigma_range = 4
 f_sigma_range = 4
@@ -94,11 +93,11 @@ if planet_name[-5:] == '.json':
 else:
     init_period, init_t0, init_aprs, init_inc, init_tdepth, init_ecc, init_omega = exoparams_to_lmfit_params(planet_name)
 
-init_fpfs = 50 / ppm if init_fpfs is None else init_fpfs
+init_fpfs = 500 / ppm if init_fpfs is None else init_fpfs
 init_u1   = 0.1 if init_u1 is None else init_u1
-init_u2   = 1e-6 if init_u2 is None else init_u2
-init_u3   = 1e-6 if init_u3 is None else init_u3
-init_u4   = 1e-6 if init_u4 is None else init_u4
+init_u2   = 0.0 if init_u2 is None else init_u2
+init_u3   = 0.0 if init_u3 is None else init_u3
+init_u4   = 0.0 if init_u4 is None else init_u4
 
 print('Acquiring Data')
 
@@ -106,7 +105,7 @@ fluxes, times, flux_errs, npix, pld_intensities, xcenters, ycenters, xwidths, yw
 
 # Only use the valid values
 fluxes = fluxes[keep_inds]
-times = times[keep_inds]
+times = times[keep_inds]+0.5
 flux_errs = flux_errs[keep_inds]
 npix = npix[keep_inds]
 xcenters = xcenters[keep_inds]
@@ -139,29 +138,31 @@ if len_init_t0 == 7 and len_times != 7:
 # Check if `init_t0` is in MJD or Simplified-MJD
 if len(str(int(init_t0))) > len(str(int(times.mean()))): init_t0 = init_t0 - 50000
 
+
+init_tsec = init_t0 + 0.5*init_period
+print('First secondary central time {}'.format(init_tsec))
+
 print('Initializing Parameters')
 initialParams = Parameters()
 initialParams.add_many(
     ('period'   , init_period, False),
-    ('deltaTc'  , -0.00005    , True  ,-0.05, 0.05),
-    ('deltaEc'  , 0.00005     , True  ,-0.05, 0.05),
+    ('deltaTc'  , -0.00005   , True  ,-0.05, 0.05),
+    ('deltaEc'  , 0.00005    , True  ,-0.05, 0.05),
     ('inc'      , init_inc   , False, 80.0, 90.),
     ('aprs'     , init_aprs  , False, 0.0, 100.),
-    ('tdepth'   , init_tdepth, False, 0.0, 0.3 ),
+    ('tdepth'   , init_tdepth, True, 0.0, 0.3 ),
     ('edepth'   , init_fpfs  , True, 0.0, 0.1),
-    ('ecc'      , init_ecc   , False, 0.0, 1.0 ),
-    ('omega'    , init_omega , False, -180, 180 ),
+    ('ecc'      , 0.1          , True, 0.0, 0.3 ),
+    ('omega'    , 90 , True, 0.0, 360 ),
     ('u1'       , init_u1    , True , 0.0, 1.0 ),
     ('u2'       , init_u2    , True,  0.0, 1.0 ),
-    ('tCenter'  , init_t0    , False))
-    # ('intcept0' , 1.0        , False),
-    # ('slope0'   , 0          , False),
-    # ('crvtur0'  , 0          , False))
-
+    ('tCenter'  , init_t0    , False),
+    ('intcept0' , 1.0        , False),
+    ('slope0'   , 0          , False),
+    ('crvtur0'  , 0          , False))
 phase = utils.compute_phase(times, init_t0, init_period)
 
-initialParams, transit_indices = models.add_line_params(initialParams, phase=phase, times=times, transitType=transit_type)
-#transit_indices = np.array([[0,len(times)]])
+transit_indices = np.array([[0,len(times)]])
 
 if method.lower() == 'pld':
     print('Initializing PLD coefficients.')
@@ -232,33 +233,26 @@ if do_mcmc == 'True':
     #import emcee
     #res = emcee.sampler(lnlikelihood = lnprob, lnprior=logprior_func)
     print('MCMC routine in progress...')
-    res   = mini.emcee(params=mle0.params, steps=400, nwalkers=100, burn=4x0, thin=10, ntemps=1,
+    res   = mini.emcee(params=mle0.params, steps=100, nwalkers=100, burn=1, thin=10, ntemps=1,
                        pos=None, reuse_sampler=False, workers=1, float_behavior='posterior',
                        is_weighted=True, seed=None)
 
                        #
     print("MCMC operation took {} seconds".format(time()-start))
 
-    joblib.dump(res,'emcee_{}_G0E0_400steps.joblib.save'.format(method))
+    joblib.dump(res,'emcee{}_g0t0.joblib.save'.format(method))
     # corner_use    = [1, 4,5,]
-    res_var_names = np.array(res.var_names)
-    res_flatchain = np.array(res.flatchain)
-    res_df = DataFrame(res_flatchain, columns=res_var_names)
-    res_df = res_df.drop(['u2','slope0'], axis=1)
+    # res_var_names = np.array(res.var_names)
+    # res_flatchain = np.array(res.flatchain)
+    # res_df = DataFrame(res_flatchain, columns=res_var_names)
+    # res_df = res_df.drop(['u2','slope'], axis=1)
     #print(res_df)
-    # # res_flatchain.T[corner_use].shape
+    # res_flatchain.T[corner_use].shape
     # corner_kw = dict(levels=[0.68, 0.95, 0.997], plot_datapoints=False, smooth=True, bins=30)
-    # #
-    # corner.corner(res_df, color='darkblue', **corner_kw, range=[(54945,54990),(0.01357,0.01385),(0.1097,0.11035),(0.996,1.002), (0.998,1.003)], plot_density=False, fill_contours=True)
     #
-    # plt.show()
+    # corner.corner(res_df, color='darkblue', **corner_kw, range=[(54945,54990),(0.01357,0.01385),(0.1097,0.11035),(0.996,1.002), (0.998,1.003)], plot_density=False, fill_contours=True)
 
-    bf_model_set = synod.generate_best_fit_solution(res.params, times=times, xcenters=xcenters, ycenters=ycenters, fluxes=fluxes, knots=knots, keep_inds=keep_inds, method=method, nearIndices=nearIndices, ind_kdtree=ind_kdtree, gw_kdtree=gw_kdtree, pld_intensities=pld_intensities, x_bin_size=x_bin_size, y_bin_size=y_bin_size, transit_indices=transit_indices)
-
-    bf_full_model = bf_model_set['full_model']
-    bf_line_model = bf_model_set['line_model']
-    bf_transit_model = bf_model_set['transit_model']
-    bf_sensitivity_map = bf_model_set['sensitivity_map']
+    plt.show()
 
 
 
@@ -284,32 +278,23 @@ if do_mcmc == 'True':
 # plt.ylabel('y-centroid', fontsize=16)
 # plt.show()
 
-times = utils.bin_data(times, 100)
-xcenters = utils.bin_data(xcenters, 100)
-ycenters = utils.bin_data(ycenters, 100)
-fluxes = utils.bin_data(fluxes, 100)
-flux_errs = utils.bin_data(flux_errs, 100)
-bf_full_model = utils.bin_data(bf_full_model, 100)
-bf_transit_model = utils.bin_data(bf_transit_model, 100)
-phase = utils.bin_data(phase, 100)
-bf_sensitivity_map = utils.bin_data(bf_sensitivity_map, 100)
-
+times = utils.bin_data(times, 50)
+xcenters = utils.bin_data(xcenters, 50)
+ycenters = utils.bin_data(ycenters, 50)
+fluxes = utils.bin_data(fluxes, 50)
+flux_errs = utils.bin_data(flux_errs, 50)
+bf_full_model = utils.bin_data(bf_full_model, 50)
+bf_transit_model = utils.bin_data(bf_transit_model, 50)
+phase = utils.bin_data(phase, 50)
 
 plt.subplot2grid ((2,1),(0,0))
 # plt.plot(times, fluxes,  linewidth=1, color='black', alpha=1)
-plt.plot(times, bf_full_model, color='red', linewidth=2)
-plt.errorbar(times, fluxes, yerr=flux_errs, ecolor = 'blue', elinewidth=0.3, fmt='none')
-plt.scatter(times, fluxes, color='black', s=7)
-plt.ylabel('Normalized Flux')
+# plt.plot(times, bf_full_model, color='red', linewidth=1)
+plt.scatter(times, fluxes, color='black', s=1)
+plt.scatter(times, bf_full_model, color='red', s=1)
 plt.subplot2grid ((2,1),(1,0))
-plt.title('Residuals')
-#plt.plot(times, fluxes-bf_full_model, linewidth=0.5, color='green')
-plt.scatter(times, fluxes-bf_full_model, s=3.5, color='green')
-plt.xlabel('Time (days)')
-plt.ylabel('Residuals')
-plt.ylim(-0.005,0.005)
+# plt.plot(times, fluxes-bf_full_model, linewidth=1, color='blue')
+plt.scatter(times, fluxes-bf_full_model, s=1, color='blue')
 plt.show()
 
-
-
-#joblib.dump(fitResult, 'lmfit{}_cat_eclipses.joblib.save'.format(method, dataDir[-40:-12]))
+joblib.dump(fitResult, 'lmfit{}_group0.joblib.save'.format(method, dataDir[-40:-12]))
