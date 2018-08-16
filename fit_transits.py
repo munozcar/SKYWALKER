@@ -147,21 +147,21 @@ initialParams.add_many(
     ('deltaEc'  , 0.00005     , True  ,-0.05, 0.05),
     ('inc'      , init_inc   , False, 80.0, 90.),
     ('aprs'     , init_aprs  , False, 0.0, 100.),
-    ('tdepth'   , init_tdepth, False, 0.0, 0.3 ),
+    ('tdepth'   , init_tdepth, True, 0.0, 0.3 ),
     ('edepth'   , init_fpfs  , True, 0.0, 0.1),
     ('ecc'      , init_ecc   , False, 0.0, 1.0 ),
     ('omega'    , init_omega , False, -180, 180 ),
     ('u1'       , init_u1    , True , 0.0, 1.0 ),
     ('u2'       , init_u2    , True,  0.0, 1.0 ),
-    ('tCenter'  , init_t0    , False))
-    # ('intcept0' , 1.0        , False),
-    # ('slope0'   , 0          , False),
-    # ('crvtur0'  , 0          , False))
+    ('tCenter'  , init_t0    , False),
+    ('intcept0' , 1.0        , False),
+    ('slope0'   , 0          , False),
+    ('crvtur0'  , 0          , False))
 
 phase = utils.compute_phase(times, init_t0, init_period)
 
-initialParams, transit_indices = models.add_line_params(initialParams, phase=phase, times=times, transitType=transit_type)
-#transit_indices = np.array([[0,len(times)]])
+#initialParams, transit_indices = models.add_line_params(initialParams, phase=phase, times=times, transitType=transit_type)
+transit_indices = np.array([[0,len(times)]])
 
 if method.lower() == 'pld':
     print('Initializing PLD coefficients.')
@@ -232,14 +232,14 @@ if do_mcmc == 'True':
     #import emcee
     #res = emcee.sampler(lnlikelihood = lnprob, lnprior=logprior_func)
     print('MCMC routine in progress...')
-    res   = mini.emcee(params=mle0.params, steps=400, nwalkers=100, burn=4x0, thin=10, ntemps=1,
+    res   = mini.emcee(params=mle0.params, steps=200, nwalkers=100, burn=40, thin=10, ntemps=1,
                        pos=None, reuse_sampler=False, workers=1, float_behavior='posterior',
                        is_weighted=True, seed=None)
 
                        #
     print("MCMC operation took {} seconds".format(time()-start))
 
-    joblib.dump(res,'emcee_{}_G0E0_400steps.joblib.save'.format(method))
+    joblib.dump(res,'emcee_{}_T0E0_200steps.joblib.save'.format(method))
     # corner_use    = [1, 4,5,]
     res_var_names = np.array(res.var_names)
     res_flatchain = np.array(res.flatchain)
