@@ -41,7 +41,7 @@ def residuals_func(model_params, times, xcenters, ycenters, fluxes, flux_errs, k
                     include_eclipse = True, include_phase_curve = True, include_polynomial = True):
     
     init_t0 = model_params['tCenter']
-    ntransits = len(transit_indices)
+    ntransits = len(transit_indices) if transit_indices is not None else 1
     
     if 'tdepth' not in model_params.keys(): include_transit = False
     if 'edepth' not in model_params.keys(): include_eclipse = False
@@ -84,9 +84,10 @@ def residuals_func(model_params, times, xcenters, ycenters, fluxes, flux_errs, k
 def generate_best_fit_solution(model_params, times, xcenters, ycenters, fluxes, knots, keep_inds, 
                                 method=None, nearIndices=None, ind_kdtree=None, gw_kdtree=None, 
                                 pld_intensities=None, x_bin_size  = 0.1, y_bin_size  = 0.1, 
-                                transit_indices=None):
+                                transit_indices=None, include_transit = True, include_eclipse = True, 
+                                include_phase_curve = True, include_polynomial = True):
     
-    ntransits = len(transit_indices)
+    ntransits = len(transit_indices) if transit_indices is not None else 1
     init_t0 = model_params['tCenter']
     
     if ntransits > 1: print('SYNOD has fitted {} transits or eclipses'.format(ntransits))
