@@ -12,7 +12,9 @@ ppm = 1e6
 day_to_seconds = 86400
 zero = 0.0
 
-def extractData(file, flux_key='phots', time_key='times', flux_err_key='noise', eff_width_key = 'npix', pld_coeff_key = 'pld', ycenter_key='ycenters', xcenter_key='xcenters', ywidth_key='ywidths', xwidth_key='xwidths'):
+def extractData(file, flux_key='phots', time_key='times', flux_err_key='noise', 
+                eff_width_key = 'npix', pld_coeff_key = 'pld', ycenter_key='ycenters', 
+                xcenter_key='xcenters', ywidth_key='ywidths', xwidth_key='xwidths'):
 
     group = joblib.load(file)
 
@@ -58,8 +60,12 @@ def removeOutliers(xcenters, ycenters, fluxes=None, x_sigma_cutoff=3, y_sigma_cu
 
     return y_ell + x_ell + f_ell < 1 if fluxes is not None else y_ell + x_ell < 1
 
-def setup_inputs_from_file(dataDir, x_bin_size=0.1, y_bin_size=0.1, xSigmaRange=4, ySigmaRange=4, fSigmaRange=4, flux_key='phots', time_key='times', flux_err_key='noise', eff_width_key = 'npix', pld_coeff_key = 'pld', ycenter_key='ycenters', xcenter_key='xcenters', ywidth_key='ywidths', xwidth_key='xwidths', method=None):
-
+def setup_inputs_from_file(dataDir, x_bin_size=0.1, y_bin_size=0.1, xSigmaRange=4, 
+                           ySigmaRange=4, fSigmaRange=4, flux_key='phots', 
+                           time_key='times', flux_err_key='noise', eff_width_key = 'npix', 
+                           pld_coeff_key = 'pld', ycenter_key='ycenters', 
+                           xcenter_key='xcenters', ywidth_key='ywidths', xwidth_key='xwidths', 
+                           method=None):
     """
     Description:
         This function takes in the filename of the data (stored with sklearn-joblib), checks the data for outliers, establishes the interpolation grid, computes the nearest neighbours between all data points and that grid, and outputs the necessary values for using BLISS. The 'flux' is assumed to be pure stellar signal -- i.e. no planet. BLISS is expected to be used inside a fitting routine where the transit has been 'divided out'. This example here assumes that there is no transit or eclipse in the light curve data (i.e. `flux` == 'stellar flux'). To use this with a light curve that contains a transit or eclipse, send the "residuals" to BLISS: - i.e. `flux = system_flux / transit_model`
