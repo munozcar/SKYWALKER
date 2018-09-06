@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 from os import environ
 from pandas import DataFrame
 from scipy import special
+from scipy.interpolate import CubicSpline
 from sklearn.externals import joblib
 from functools import partial
 from lmfit import Parameters, Minimizer, report_errors
@@ -72,8 +73,6 @@ def add_cubicspline_to_phase_curve_model(model_params, times, init_t0, phase_cur
     x2_1 = times[t2_1]
     x3_1 = times[t3_1]
     x4_1 = times[t4_1]
-    
-    from scipy.interpolate import CubicSpline
     
     ecl_top = np.where(eclipse_model == eclipse_model.max())[0]
     ecl_bottom = np.where(ecl_bottom)[0]
