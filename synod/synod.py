@@ -176,15 +176,19 @@ def compute_full_model(model_params, times, include_transit = True,
     where_eclipse = np.where(eclipse_model < eclipse_model.max())[0]
     
     ecl_bottom = eclipse_model == eclipse_model.min()
-    model_params['edepth'].value = phase_curve_model[ecl_bottom].mean() - 1.0
-    # model_params['edepth'].value = phase_curve_model[ecl_bottom].max() - 1.0 # ??
+    # model_params['edepth'].value = phase_curve_model[ecl_bottom].mean() - 1.0
+    model_params['edepth'].value = phase_curve_model[ecl_bottom].max() - 1.0 # ??
     
     mutl_ecl = True
-    if eclipse_option == 'cubicspline':
-        phase_curve_model = add_cubicspline_to_phase_curve_model(model_params, times, init_t0, phase_curve_model, eclipse_model)
-        mutl_ecl = False
-    elif eclipse_option == 'trapezoid':
-        phase_curve_model = add_trap_to_phase_curve_model(model_params, times, init_t0, phase_curve_model, eclipse_model)
+    if model_params['edepth'].value > 0.0 and np.isfinite(model_params['edepth'].value):
+        if eclipse_option == 'cubicspline':
+            phase_curve_model = add_cubicspline_to_phase_curve_model(model_params, times, init_t0, phase_curve_model, eclipse_model)
+            mutl_ecl = False
+        elif eclipse_option == 'trapezoid':
+            phase_curve_model = add_trap_to_phase_curve_model(model_params, times, init_t0, phase_curve_model, eclipse_model)
+            mutl_ecl = False
+    else:
+        print('Edepth: {}'.format(model_params['edepth'].value))
         mutl_ecl = False
     
     if np.allclose(phase_curve_model, np.ones(phase_curve_model.size)): mutl_ecl = True
@@ -194,9 +198,6 @@ def compute_full_model(model_params, times, include_transit = True,
     
     if mutl_ecl: physical_model = physical_model*eclipse_model
     
-    # in_eclipse = np.where(eclipse_model < eclipse_model.max())[0]
-    # physical_model[in_eclipse] = np.maximum(physical_model[in_eclipse], 1.0)#eclipse_model.min())
-    
     if return_case == 'dict':
         output = {}
         # output['line_model'] = line_model
@@ -205,6 +206,7 @@ def compute_full_model(model_params, times, include_transit = True,
         output['eclipse_model'] = eclipse_model
         output['line_model'] = line_model
         output['phase_curve_model'] = phase_curve_model
+        
         return output
     else:
         return physical_model
@@ -217,7 +219,7 @@ def residuals_func(model_params, times, xcenters, ycenters, fluxes, flux_errs, k
     
     physical_model = compute_full_model(model_params, times, include_transit = include_transit, 
                         include_eclipse = include_eclipse, include_phase_curve = include_phase_curve, 
-                        include_polynomial = include_polynomial, eclipse_option = eclipse_option, use_trap = use_trap)
+                        include_polynomial = include_polynomial, eclipse_option = eclipse_option)
     
     if testing_model: return physical_model
     
@@ -249,31 +251,27 @@ def generate_best_fit_solution(model_params, times, xcenters, ycenters, fluxes, 
                                 transit_indices=None, include_transit = True, include_eclipse = True, 
                                 include_phase_curve = True, include_polynomial = True, eclipse_option = 'trapezoid'):
     
-    physical_model, transit_model, eclipse_model, line_model, phase_curve_model = compute_full_model(
-                        model_params, times, include_transit = include_transit, include_eclipse = include_eclipse, 
-                        include_phase_curve = include_phase_curve, include_polynomial = include_polynomial, 
-                        eclipse_option = eclipse_option, return_case='all')
+    output = compute_full_model(model_params, times, include_transit = include_transit, include_eclipse = include_eclipse, 
+                                include_phase_curve = include_phase_curve, include_polynomial = include_polynomial, 
+                                eclipse_option = eclipse_option, return_case='dict')
     
     # compute the systematics model
     assert (method.lower() == 'bliss' or method.lower() == 'krdata' or method.lower() == 'pld'), "Invalid method."
-    residuals = fluxes / physical_model
+    
+    residuals = fluxes / output['physical_model']
     sensitivity_map = models.compute_sensitivity_map(model_params=model_params, method=method, xcenters=xcenters, ycenters=ycenters, 
                                                         residuals=residuals, knots=knots, nearIndices=nearIndices, xBinSize=x_bin_size, 
                                                         yBinSize=y_bin_size, ind_kdtree=ind_kdtree, gw_kdtree=gw_kdtree, 
-                                                        pld_intensities=pld_intensities, model=physical_model)
+                                                        pld_intensities=pld_intensities, model=output['physical_model'])
     
-    model = physical_model*sensitivity_map
+    model = output['physical_model']*sensitivity_map
     
-    output = {}
     output['full_model'] = model
-    # output['line_model'] = line_model
-    output['physical_model'] = physical_model
     output['sensitivity_map'] = sensitivity_map
-    output['transit_model'] = transit_model
-    output['eclipse_model'] = eclipse_model
-    output['line_model'] = line_model
-    output['phase_curve_model'] = phase_curve_model
-    
-    # print('LOADING...')
+    # output['physical_model'] = physical_model
+    # output['transit_model'] = transit_model
+    # output['eclipse_model'] = eclipse_model
+    # output['line_model'] = line_model
+    # output['phase_curve_model'] = phase_curve_model
     
     return output
