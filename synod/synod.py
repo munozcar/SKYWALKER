@@ -180,16 +180,25 @@ def compute_full_model(model_params, times, include_transit = True,
     model_params['edepth'].value = phase_curve_model[ecl_bottom].max() - 1.0 # ??
     
     mutl_ecl = True
-    if model_params['edepth'].value > 0.0 and np.isfinite(model_params['edepth'].value):
-        if eclipse_option == 'cubicspline':
-            phase_curve_model = add_cubicspline_to_phase_curve_model(model_params, times, init_t0, phase_curve_model, eclipse_model)
+    try:
+        if model_params['edepth'].value > 0.0 and np.isfinite(model_params['edepth'].value):
             mutl_ecl = False
-        elif eclipse_option == 'trapezoid':
-            phase_curve_model = add_trap_to_phase_curve_model(model_params, times, init_t0, phase_curve_model, eclipse_model)
+            if eclipse_option == 'cubicspline':
+                phase_curve_model = add_cubicspline_to_phase_curve_model(model_params, times, init_t0, phase_curve_model, eclipse_model)
+            elif eclipse_option == 'trapezoid':
+                phase_curve_model = add_trap_to_phase_curve_model(model_params, times, init_t0, phase_curve_model, eclipse_model)
+        else:
+            print('Edepth: {}'.format(model_params['edepth'].value))
             mutl_ecl = False
-    else:
-        print('Edepth: {}'.format(model_params['edepth'].value))
+    except Exception as e:
         mutl_ecl = False
+        
+        print('\n[WARNING] Failure Occured with {}'.format(str(e)))
+        print('[WARNING] Model Params at Failure were')
+        for val in model_params.values(): 
+            print('\t\t{:11}: {:3}\t[{:5}, {:5}]\t{}'.format(val.name, str(val.value)[:10], str(val.min)[:5], str(val.max)[:5], str(val.vary)))
+        
+        print('\n[WARNING] BATMAN Eclipse Model Summation: {}'.format(eclipse_model.sum()))
     
     if np.allclose(phase_curve_model, np.ones(phase_curve_model.size)): mutl_ecl = True
     # non-systematics model (i.e. (star + planet) / star
