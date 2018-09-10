@@ -255,7 +255,7 @@ def add_line_params(model_params, phase, times, transitType='primary'):
             print(error_messages[single_transit])
 
             ph_transits[-1]
-
+    
     if not single_transit and idx_start != len(ph_transits) - 1:
         '''Catch the last ocurrence'''
         kt = kt + 1  #
@@ -264,18 +264,48 @@ def add_line_params(model_params, phase, times, transitType='primary'):
         model_params.add_many(('crvtur{}'.format(kt), 0.0, False))
         idx_end = ph_transits[-1]
         transit_indices.append([idx_start,idx_end+1])
-
+    
     return model_params, transit_indices
 
-def add_pld_params(model_params, fluxes, pld_intensities, n_pld = 9):
-    pld_coeffs = np.linalg.lstsq(pld_intensities.T, fluxes)[0]
-    print(pld_coeffs)
-    for k in range(n_pld):
+def add_pld_params(model_params, fluxes, pld_intensities, n_pld = 9, order=3, do_pca=True, n_ppm = 1.0, verbose=False):
+    
+    # Make a local copy
+    pld_intensities = pld_intensities.copy()
+    
+    if len(pld_intensities) != n_pld * order:
+        pld_intensities = np.vstack([list(pld_intensities**k) for k in range(1,order+1)])
+    
+    # check that the second set is the square of the first set, and so onself.
+    for k in range(order):
+        assert(np.allclose(pld_intensities[:n_pld]**(k+1), pld_intensities[k*n_pld:(k+1)*n_pld]))
+    
+    from sklearn.decomposition import PCA
+    from sklearn.preprocessing import StandardScaler
+    pca = PCA()
+    stdscaler = StandardScaler()
+    
+    pld_intensities = stdscaler.fit_transform(pld_intensities)
+    if do_pca:
+        pld_intensities = pca.fit_transform(pld_intensities.T)
+        
+        evrc = pca.explained_variance_ratio_.cumsum()
+        n_pca = np.where(evrc > 1.0-1.0/ppm)[0].min()
+        pld_intensities = pld_intensities[:n_ppm]
+        
+        if verbose: print(evrc, n_pca)
+    else:
+        pld_intensities =  pld_intensities.T
+    
+    pld_coeffs = np.linalg.lstsq(pld_intensities, fluxes)[0]
+    
+    [print('pld{:2}: {}'.format(str(k), pldc)) for k, pldc in enumerate(pld_coeffs)];
+    
+    for k in range(n_pld*order):
         model_params.add_many(('pld{}'.format(k), pld_coeffs[k], True))
-    return model_params
+    
+    return model_params, pld_intensities
 
 ## FROM KBS MODELS
-
 def sincos(rampparams, t, etc = []):
    """
   This function creates a model that fits a sinusoid.

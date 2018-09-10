@@ -86,11 +86,22 @@ def setup_inputs_from_file(dataDir, x_bin_size=0.1, y_bin_size=0.1, xSigmaRange=
         nearIndices (nDarray): nearest neighbour indices per point for location
         of nearest knots keep_inds (list): list of indicies to keep within the thresholds set.
     """
-    assert (method.lower() == 'bliss' or method.lower() == 'krdata' or method.lower() == 'pld'), "No valid method selected."
+    assert (method.lower() in 'bliss', 'krdata', 'pld'), "No valid method selected."
+    
     print('Setting up inputs for {}.'.format(method))
-
-    fluxes, times, flux_errs, npix, pld_intensities, xcenters, ycenters, xwidths, ywidths = extractData(dataDir, flux_key=flux_key, time_key=time_key, flux_err_key=flux_err_key, eff_width_key = eff_width_key, pld_coeff_key = pld_coeff_key, ycenter_key=ycenter_key, xcenter_key=xcenter_key, ywidth_key=ywidth_key, xwidth_key=xwidth_key)
-    # fluxes is none by default for now...
+    
+    fluxes, times, flux_errs, npix, pld_intensities, xcenters, ycenters, xwidths, ywidths = extractData(file = dataDir, 
+                                                                                                        flux_key = flux_key, 
+                                                                                                        time_key = time_key, 
+                                                                                                        flux_err_key = flux_err_key, 
+                                                                                                        eff_width_key = eff_width_key, 
+                                                                                                        pld_coeff_key = pld_coeff_key, 
+                                                                                                        ycenter_key = ycenter_key, 
+                                                                                                        xcenter_key = xcenter_key, 
+                                                                                                        ywidth_key = ywidth_key, 
+                                                                                                        xwidth_key = xwidth_key)
+    
+    # fluxes is None by default for now...
     keep_inds = removeOutliers(xcenters, ycenters, fluxes=None, x_sigma_cutoff=xSigmaRange, y_sigma_cutoff=ySigmaRange, f_sigma_cutoff=fSigmaRange)
     if method.lower() == 'bliss':
         print('Setting up BLISS')

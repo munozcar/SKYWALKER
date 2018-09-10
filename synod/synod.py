@@ -201,8 +201,8 @@ def compute_full_model(model_params, times, include_transit = True,
         print('\n[WARNING] BATMAN Eclipse Model Summation: {}'.format(eclipse_model.sum()))
     
     if np.allclose(phase_curve_model, np.ones(phase_curve_model.size)): mutl_ecl = True
-    # non-systematics model (i.e. (star + planet) / star
     
+    # non-systematics model (i.e. (star + planet) / star
     physical_model = transit_model*line_model*phase_curve_model
     
     if mutl_ecl: physical_model = physical_model*eclipse_model
