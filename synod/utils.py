@@ -15,9 +15,9 @@ zero = 0.0
 def extractData(file, flux_key='phots', time_key='times', flux_err_key='noise', 
                 eff_width_key = 'npix', pld_coeff_key = 'pld', ycenter_key='ycenters', 
                 xcenter_key='xcenters', ywidth_key='ywidths', xwidth_key='xwidths'):
-
+    
     group = joblib.load(file)
-
+    
     fluxes = group[flux_key].flatten()
     times = group[time_key].flatten()
     flux_errs = group[flux_err_key].flatten()
@@ -27,7 +27,7 @@ def extractData(file, flux_key='phots', time_key='times', flux_err_key='noise',
     ycenters = group[ycenter_key].flatten()
     xwidths = group[xwidth_key].flatten()
     ywidths = group[ywidth_key].flatten()
-
+    
     return fluxes, times, flux_errs, npix, pld_intensities, xcenters, ycenters, xwidths, ywidths
 
 def nearest(xc, yc, neighbors, tree):
@@ -86,7 +86,7 @@ def setup_inputs_from_file(dataDir, x_bin_size=0.1, y_bin_size=0.1, xSigmaRange=
         nearIndices (nDarray): nearest neighbour indices per point for location
         of nearest knots keep_inds (list): list of indicies to keep within the thresholds set.
     """
-    assert (method.lower() in 'bliss', 'krdata', 'pld'), "No valid method selected."
+    assert (method.lower() in ['bliss', 'krdata', 'pld']), "No valid method selected."
     
     print('Setting up inputs for {}.'.format(method))
     
@@ -106,29 +106,32 @@ def setup_inputs_from_file(dataDir, x_bin_size=0.1, y_bin_size=0.1, xSigmaRange=
     if method.lower() == 'bliss':
         print('Setting up BLISS')
         knots = bliss.createGrid(xcenters[keep_inds], ycenters[keep_inds], x_bin_size, y_bin_size)
+        
         print('BLISS will use a total of {} knots'.format(len(knots)))
         knotTree = spatial.cKDTree(knots)
         nearIndices = bliss.nearestIndices(xcenters[keep_inds], ycenters[keep_inds], knotTree)
+        
         ind_kdtree = None
         gw_kdtree = None
     elif method.lower() == 'krdata':
         print('Setting up KRDATA')
-        n_nbr   = 100
+        n_nbr = 100
         expansion = 1000
 
         xpos = xcenters[keep_inds] - np.median(xcenters[keep_inds])
         ypos = (ycenters[keep_inds] - np.median(ycenters[keep_inds]))/0.7
         np0 = sqrt(npix[keep_inds])
         np0 = (np0 - median(np0))
+        
+        points = np.transpose([xpos, ypos, np0])
+        kdtree = spatial.cKDTree(points * expansion)
 
-        points  = np.transpose([xpos, ypos, np0])
-        kdtree  = spatial.cKDTree(points * expansion)
-
-        ind_kdtree  = kdtree.query(kdtree.data, n_nbr+1)[1][:,1:]
-        gw_kdtree = kr.gaussian_weights_and_nearest_neighbors(  xpos=xpos,
-                                                                ypos=ypos,
-                                                                npix=np0,
-                                                                inds=ind_kdtree )
+        ind_kdtree = kdtree.query(kdtree.data, n_nbr+1)[1][:,1:]
+        gw_kdtree = kr.gaussian_weights_and_nearest_neighbors(  xpos = xpos,
+                                                                ypos = ypos,
+                                                                npix = np0,
+                                                                inds = ind_kdtree )
+        
         knots = None
         nearIndices = None
     elif method.lower() == 'pld':
@@ -137,7 +140,7 @@ def setup_inputs_from_file(dataDir, x_bin_size=0.1, y_bin_size=0.1, xSigmaRange=
         gw_kdtree = None
         knots = None
         nearIndices = None
-
+    
     return fluxes, times, flux_errs, npix, pld_intensities, xcenters, ycenters, xwidths, ywidths, knots, nearIndices, keep_inds, ind_kdtree, gw_kdtree
 
 def exoparams_to_lmfit_params(planet_name):

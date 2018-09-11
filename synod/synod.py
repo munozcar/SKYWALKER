@@ -277,10 +277,5 @@ def generate_best_fit_solution(model_params, times, xcenters, ycenters, fluxes, 
     
     output['full_model'] = model
     output['sensitivity_map'] = sensitivity_map
-    # output['physical_model'] = physical_model
-    # output['transit_model'] = transit_model
-    # output['eclipse_model'] = eclipse_model
-    # output['line_model'] = line_model
-    # output['phase_curve_model'] = phase_curve_model
     
     return output

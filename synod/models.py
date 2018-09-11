@@ -4,6 +4,9 @@ from . import bliss
 from . import utils
 from . import krdata as kr
 from statsmodels.robust import scale
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+
 import matplotlib.pyplot as plt
 import numpy.linalg as linear
 # Global constants.
@@ -186,10 +189,10 @@ def compute_sensitivity_map(model_params, method, xcenters, ycenters, residuals,
     elif method == 'krdata':
         sensitivity_map  = np.sum(residuals[ind_kdtree]  * gw_kdtree, axis=1)
     elif method == 'pld':
-        PLDcoeffs = sorted([val for key, val in model_params.items() if 'pld' in key.lower()])
+        PLDcoeffs = [val.value for val in model_params.values() if 'pld' in val.name.lower()]
         sensitivity_map = np.dot(PLDcoeffs, pld_intensities)
     else:
-        print('INVALID METHOD: ABORT')
+        print('INVALID METHOD: ABORT!')
     
     nSig = 10
     vbad_sm = np.where(abs(sensitivity_map - np.median(sensitivity_map)) > nSig*scale.mad(sensitivity_map))[0]
@@ -203,10 +206,10 @@ def compute_sensitivity_map(model_params, method, xcenters, ycenters, residuals,
         start_corner_case = True
     else:
         start_corner_case = False
-
+    
     vbad_sm = np.array(vbad_sm)
     sensitivity_map[vbad_sm] = 0.5*(sensitivity_map[vbad_sm-1] + sensitivity_map[vbad_sm+1])
-
+    
     if end_corner_case: sensitivity_map[-1] = sensitivity_map[2]
     if start_corner_case: sensitivity_map[0] = sensitivity_map[1]
 
@@ -267,7 +270,10 @@ def add_line_params(model_params, phase, times, transitType='primary'):
     
     return model_params, transit_indices
 
-def add_pld_params(model_params, fluxes, pld_intensities, n_pld = 9, order=3, do_pca=True, n_ppm = 1.0, verbose=False):
+def add_pld_params(model_params, fluxes, pld_intensities, 
+                    n_pld = 9, order=3, do_pca=True, add_unity = True, 
+                    do_std=True, pca_cut=False, n_ppm = 1.0, 
+                    start_unity=False, verbose=False):
     
     # Make a local copy
     pld_intensities = pld_intensities.copy()
@@ -276,34 +282,32 @@ def add_pld_params(model_params, fluxes, pld_intensities, n_pld = 9, order=3, do
         pld_intensities = np.vstack([list(pld_intensities**k) for k in range(1,order+1)])
     
     # check that the second set is the square of the first set, and so onself.
-    for k in range(order):
-        assert(np.allclose(pld_intensities[:n_pld]**(k+1), pld_intensities[k*n_pld:(k+1)*n_pld]))
+    for k in range(order): assert(np.allclose(pld_intensities[:n_pld]**(k+1), pld_intensities[k*n_pld:(k+1)*n_pld]))
     
-    from sklearn.decomposition import PCA
-    from sklearn.preprocessing import StandardScaler
     pca = PCA()
     stdscaler = StandardScaler()
+    pld_intensities = stdscaler.fit_transform(pld_intensities.T) if do_std else pld_intensities.T
     
-    pld_intensities = stdscaler.fit_transform(pld_intensities)
     if do_pca:
-        pld_intensities = pca.fit_transform(pld_intensities.T)
+        pld_intensities = pca.fit_transform(pld_intensities)
         
         evrc = pca.explained_variance_ratio_.cumsum()
         n_pca = np.where(evrc > 1.0-1.0/ppm)[0].min()
-        pld_intensities = pld_intensities[:n_ppm]
+        if pca_cut: pld_intensities = pld_intensities[:,:n_ppm]
         
         if verbose: print(evrc, n_pca)
-    else:
-        pld_intensities =  pld_intensities.T
     
-    pld_coeffs = np.linalg.lstsq(pld_intensities, fluxes)[0]
+    print(pld_intensities.shape, np.ones(pld_intensities.shape[0]).shape)
+    if add_unity: pld_intensities = np.vstack([pld_intensities.T, np.ones(pld_intensities.shape[0])]).T
+    print(pld_intensities.shape, fluxes.shape)
+    pld_coeffs, _, _, _ = np.linalg.lstsq(pld_intensities, fluxes)  if not start_unity else np.ones(pld_intensities.shape[1])
     
-    [print('pld{:2}: {}'.format(str(k), pldc)) for k, pldc in enumerate(pld_coeffs)];
-    
-    for k in range(n_pld*order):
+    for k in range(n_pld*order+add_unity):
         model_params.add_many(('pld{}'.format(k), pld_coeffs[k], True))
     
-    return model_params, pld_intensities
+    if verbose: [print('{:5}: {}'.format(val.name, val.value)) for val in model_params.values() if 'pld' in val.name.lower()];
+    
+    return model_params, pld_intensities.T
 
 ## FROM KBS MODELS
 def sincos(rampparams, t, etc = []):
