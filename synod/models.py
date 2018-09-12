@@ -293,7 +293,7 @@ def add_pld_params(model_params, fluxes, pld_intensities,
         
         evrc = pca.explained_variance_ratio_.cumsum()
         n_pca = np.where(evrc > 1.0-n_ppm/ppm)[0].min()
-        if pca_cut: pld_intensities = pld_intensities[:n_pca]
+        if pca_cut: pld_intensities = pld_intensities[:,:n_pca]
         
         if verbose: print(evrc, n_pca)
     
@@ -301,92 +301,12 @@ def add_pld_params(model_params, fluxes, pld_intensities,
     
     pld_coeffs, _, _, _ = np.linalg.lstsq(pld_intensities, fluxes)  if not start_unity else np.ones(pld_intensities.shape[1])
     
-    for k in range(n_pld*order+add_unity):
-        model_params.add_many(('pld{}'.format(k), pld_coeffs[k], True))
+    n_pld_out = n_pca if pca_cut else n_pld*order
+    
+    for k in range(n_pld_out): model_params.add_many(('pld{}'.format(k), pld_coeffs[k], True))
+    
+    if add_unity: model_params.add_many(('pld{}'.format(n_pld_out), pld_coeffs[n_pld_out], True)) # FINDME: Maybe make min,max = 0,2 or = 0.9,1.1
     
     if verbose: [print('{:5}: {}'.format(val.name, val.value)) for val in model_params.values() if 'pld' in val.name.lower()];
     
     return model_params, pld_intensities.T
-
-## FROM KBS MODELS
-def sincos(rampparams, t, etc = []):
-   """
-  This function creates a model that fits a sinusoid.
-
-  Parameters
-  ----------
-    a/b:    amplitude
-    p1/p2:    period
-    t1/t2:  phase/time offset
-    c:      vertical offset
-    t:        Array of time/phase points
-
-  Returns
-  -------
-    This function returns an array of y values...
-
-  Revisions
-  ---------
-  2010-08-01    Kevin Stevenson, UCF 
-                kevin218@knights.ucf.edu
-                Original version
-   """
-
-   a     = rampparams[0]
-   p1    = rampparams[1]
-   t1    = rampparams[2]
-   b     = rampparams[3]
-   p2    = rampparams[4]
-   t2    = rampparams[5]
-   c     = rampparams[6]
-   pi    = np.pi
-
-   return ne.evaluate('a*sin(2*pi*(t-t1)/p1) + b*cos(2*pi*(t-t2)/p2) + c')
-
-def sincos2(rampparams, t, etc = []):
-    """
-    This function creates a model that fits a sinusoid.
-
-    Parameters
-    ----------
-    c#a/s#a     : amplitude
-    c#o/s#o     : phase/time offset
-    p           : period
-    c           : vertical offset
-    t           : Array of time/phase points
-
-    Returns
-    -------
-    This function returns an array of values.
-
-    Revisions
-    ---------
-    2013-11-22    Kevin Stevenson 
-                kbs@uchicago.edu
-                Modified from sincos.py
-    """
-
-    c1a   = rampparams[0]
-    c1o   = rampparams[1]
-    c2a   = rampparams[2]
-    c2o   = rampparams[3]
-    s1a   = rampparams[4]
-    s1o   = rampparams[5]
-    s2a   = rampparams[6]
-    s2o   = rampparams[7]
-    p     = rampparams[8]
-    c     = rampparams[9]
-    midpt = rampparams[10]
-    t14   = rampparams[11]
-    t12   = rampparams[12]
-    pi    = np.pi
-    
-    flux = ne.evaluate('c1a*cos(2*pi*(t-c1o)/p) + c2a*cos(4*pi*(t-c2o)/p) + s1a*sin(2*pi*(t-s1o)/p) + s2a*sin(4*pi*(t-s2o)/p) + c')
-    
-    #Flatten sin/cos during eclipse
-    iecl = np.where(np.bitwise_or((t-midpt)%p >= p-(t14-t12)/2.,(t-midpt)%p <= (t14-t12)/2.))
-    #print(iecl)
-    #flux[iecl] = np.mean(flux[iecl])
-    flux[iecl] = c1a*np.cos(2*pi*(midpt-c1o)/p) + c2a*np.cos(4*pi*(midpt-c2o)/p) + s1a*np.sin(2*pi*(midpt-s1o)/p) + s2a*np.sin(4*pi*(midpt-s2o)/p) + c
-    
-    return flux

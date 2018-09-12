@@ -250,7 +250,13 @@ def residuals_func(model_params, times, xcenters, ycenters, fluxes, flux_errs, k
                                                      pld_intensities=pld_intensities, 
                                                      model=physical_model)
     
-    model = physical_model*sensitivity_map
+    if 't_start' in model_params.keys() and 'weirdslope' in model_params.keys() and 'weirdintercept' in model_params.keys():
+        weirdness = np.ones(times.size)
+        weirdness[times > model_params['t_start']] = model_params['weirdslope']*(times[times > model_params['t_start']]-times.mean()) + model_params['weirdintercept']
+    else:
+        weirdness = 1.0
+    
+    model = physical_model*sensitivity_map*weirdness
     
     return (model - fluxes) / flux_errs 
 
