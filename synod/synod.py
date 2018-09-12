@@ -198,7 +198,7 @@ def compute_full_model(model_params, times, include_transit = True,
         for val in model_params.values(): 
             print('\t\t{:11}: {:3}\t[{:5}, {:5}]\t{}'.format(val.name, str(val.value)[:10], str(val.min)[:5], str(val.max)[:5], str(val.vary)))
         
-        print('\n[WARNING] BATMAN Eclipse Model Summation: {}'.format(eclipse_model.sum()))
+        print('\n[WARNING] BATMAN Eclipse Model Mean: {}'.format(eclipse_model.mean()))
     
     if np.allclose(phase_curve_model, np.ones(phase_curve_model.size)): mutl_ecl = True
     

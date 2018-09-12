@@ -292,14 +292,13 @@ def add_pld_params(model_params, fluxes, pld_intensities,
         pld_intensities = pca.fit_transform(pld_intensities)
         
         evrc = pca.explained_variance_ratio_.cumsum()
-        n_pca = np.where(evrc > 1.0-1.0/ppm)[0].min()
-        if pca_cut: pld_intensities = pld_intensities[:,:n_ppm]
+        n_pca = np.where(evrc > 1.0-n_ppm/ppm)[0].min()
+        if pca_cut: pld_intensities = pld_intensities[:n_pca]
         
         if verbose: print(evrc, n_pca)
     
-    print(pld_intensities.shape, np.ones(pld_intensities.shape[0]).shape)
     if add_unity: pld_intensities = np.vstack([pld_intensities.T, np.ones(pld_intensities.shape[0])]).T
-    print(pld_intensities.shape, fluxes.shape)
+    
     pld_coeffs, _, _, _ = np.linalg.lstsq(pld_intensities, fluxes)  if not start_unity else np.ones(pld_intensities.shape[1])
     
     for k in range(n_pld*order+add_unity):
