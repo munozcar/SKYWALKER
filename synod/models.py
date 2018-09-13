@@ -299,7 +299,8 @@ def add_pld_params(model_params, fluxes, pld_intensities,
     
     if add_unity: pld_intensities = np.vstack([pld_intensities.T, np.ones(pld_intensities.shape[0])]).T
     
-    pld_coeffs, _, _, _ = np.linalg.lstsq(pld_intensities, fluxes)  if not start_unity else np.ones(pld_intensities.shape[1])
+    print(pld_intensities.shape)
+    pld_coeffs = np.linalg.lstsq(pld_intensities, fluxes)[0] if not start_unity else np.ones(pld_intensities.shape[1]) / pld_intensities.shape[1.0]
     
     n_pld_out = n_pca if pca_cut else n_pld*order
     
