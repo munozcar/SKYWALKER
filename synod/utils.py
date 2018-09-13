@@ -86,7 +86,7 @@ def setup_inputs_from_file(dataDir, x_bin_size=0.1, y_bin_size=0.1, xSigmaRange=
         nearIndices (nDarray): nearest neighbour indices per point for location
         of nearest knots keep_inds (list): list of indicies to keep within the thresholds set.
     """
-    assert (method.lower() in ['bliss', 'krdata', 'pld']), "No valid method selected."
+    assert ('bliss' in method.lower() or  'krdata' in method.lower() or 'pld' in method.lower()]), "No valid method selected."
     
     print('Setting up inputs for {}.'.format(method))
     
@@ -103,7 +103,7 @@ def setup_inputs_from_file(dataDir, x_bin_size=0.1, y_bin_size=0.1, xSigmaRange=
     
     # fluxes is None by default for now...
     keep_inds = removeOutliers(xcenters, ycenters, fluxes=None, x_sigma_cutoff=xSigmaRange, y_sigma_cutoff=ySigmaRange, f_sigma_cutoff=fSigmaRange)
-    if method.lower() == 'bliss':
+    if 'bliss' in method.lower():
         print('Setting up BLISS')
         knots = bliss.createGrid(xcenters[keep_inds], ycenters[keep_inds], x_bin_size, y_bin_size)
         
@@ -113,7 +113,7 @@ def setup_inputs_from_file(dataDir, x_bin_size=0.1, y_bin_size=0.1, xSigmaRange=
         
         ind_kdtree = None
         gw_kdtree = None
-    elif method.lower() == 'krdata':
+    elif 'krdata' in method.lower():
         print('Setting up KRDATA')
         n_nbr = 100
         expansion = 1000
@@ -134,7 +134,7 @@ def setup_inputs_from_file(dataDir, x_bin_size=0.1, y_bin_size=0.1, xSigmaRange=
         
         knots = None
         nearIndices = None
-    elif method.lower() == 'pld':
+    elif 'pld' in method.lower():
         print('Using PLD')
         ind_kdtree = None
         gw_kdtree = None

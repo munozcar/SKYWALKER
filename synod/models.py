@@ -183,12 +183,12 @@ def trapezoid_model(model_params, times, init_t0, include_transit = True,
     return trap_model
 
 def compute_sensitivity_map(model_params, method, xcenters, ycenters, residuals, knots, nearIndices, xBinSize, yBinSize, ind_kdtree, gw_kdtree, pld_intensities, model):
-    if method == 'bliss' :
+    if 'bliss' in method.lower():
         normFactor = (1/xBinSize) * (1/yBinSize)
         sensitivity_map = bliss.BLISS(xcenters, ycenters, residuals, knots, nearIndices, xBinSize=xBinSize, yBinSize=xBinSize, normFactor=normFactor)
-    elif method == 'krdata':
+    elif 'krdata' in method.lower():
         sensitivity_map  = np.sum(residuals[ind_kdtree]  * gw_kdtree, axis=1)
-    elif method == 'pld':
+    elif 'pld' in method.lower():
         PLDcoeffs = [val.value for val in model_params.values() if 'pld' in val.name.lower()]
         sensitivity_map = np.dot(PLDcoeffs, pld_intensities)
     else:
