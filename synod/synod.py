@@ -252,7 +252,8 @@ def residuals_func(model_params, times, xcenters, ycenters, fluxes, flux_errs, k
     
     if 't_start' in model_params.keys() and 'weirdslope' in model_params.keys() and 'weirdintercept' in model_params.keys():
         weirdness = np.ones(times.size)
-        weirdness[times > model_params['t_start']] = model_params['weirdslope']*(times[times > model_params['t_start']]-times.mean()) + model_params['weirdintercept']
+        weirdness[times - times.mean() > model_params['t_start']] = model_params['weirdslope']*(times[times - times.mean() > model_params['t_start']]-times.mean()) \
+                                                                  + model_params['weirdintercept']
     else:
         weirdness = 1.0
     
@@ -279,9 +280,17 @@ def generate_best_fit_solution(model_params, times, xcenters, ycenters, fluxes, 
                                                         yBinSize=y_bin_size, ind_kdtree=ind_kdtree, gw_kdtree=gw_kdtree, 
                                                         pld_intensities=pld_intensities, model=output['physical_model'])
     
-    model = output['physical_model']*sensitivity_map
+    if 't_start' in model_params.keys() and 'weirdslope' in model_params.keys() and 'weirdintercept' in model_params.keys():
+        weirdness = np.ones(times.size)
+        weirdness[times - times.mean() > model_params['t_start']] = model_params['weirdslope']*(times[times - times.mean() > model_params['t_start']]-times.mean()) \
+                                                                  + model_params['weirdintercept']
+    else:
+        weirdness = 1.0
+    
+    model = output['physical_model']*sensitivity_map*weirdness
     
     output['full_model'] = model
     output['sensitivity_map'] = sensitivity_map
+    output['weirdness'] = weirdness
     
     return output
