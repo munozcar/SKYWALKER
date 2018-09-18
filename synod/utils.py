@@ -86,7 +86,7 @@ def setup_inputs_from_file(dataDir, x_bin_size=0.1, y_bin_size=0.1, xSigmaRange=
         nearIndices (nDarray): nearest neighbour indices per point for location
         of nearest knots keep_inds (list): list of indicies to keep within the thresholds set.
     """
-    assert ('bliss' in method.lower() or  'krdata' in method.lower() or 'pld' in method.lower()]), "No valid method selected."
+    assert ('bliss' in method.lower() or  'krdata' in method.lower() or 'pld' in method.lower()), "No valid method selected."
     
     print('Setting up inputs for {}.'.format(method))
     
@@ -174,3 +174,107 @@ def bin_data(data, bin_size):
         binned.append(np.mean(data[init:i*bin_size]))
         init = i*bin_size
     return np.array(binned)
+
+def sub_ax_split(x, y, axs, markersize=5, alpha=0.5, lw=0, mew=0, bins=100, histtype='stepfilled', orientation='horizontal', color='gray', label=None, returnHist=False):
+    ax_scat, ax_hist = axs
+    ax_scat.plot(x, y, '.', color=color, markersize=markersize, alpha=alpha, mew=0, label=label)
+    yhist, xhist, patches = ax_hist.hist(y, bins=bins, histtype=histtype, orientation=orientation, color=color, density=False);
+    
+    if returnHist: return yhist, xhist, patches
+
+def plot_fit_residuals_physics(times, fluxes, flux_errs, model_set, planet_name='', channel='', staticRad='', 
+                                    varRad='', method='', plot_name='', time_stamp='', nSig=3, save_now=False, 
+                                    label_kwargs={}, title_kwargs={}, color_cycle = None, hspace=1.0, figsize=(30, 15),
+                                    returnAx=False, save_dir=''):
+    
+    if 'fontsize' not in title_kwargs.keys(): title_kwargs['fontsize'] = 20
+    
+    if 'fontsize' not in label_kwargs.keys(): label_kwargs['fontsize'] = 20
+    
+    if color_cycle is None: color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    
+    print('Establishing the {} Solution'.format(plot_name))
+    
+    full_model = model_set['full_model']
+    line_model = model_set['line_model']
+    physical_model = model_set['physical_model']
+    sensitivity_map = model_set['sensitivity_map']
+    weirdness = model_set['weirdness']
+    
+    bin_size = 10
+    
+    times_binned = bin_data(times, bin_size = bin_size)
+    fluxes_binned = bin_data(fluxes, bin_size = bin_size)
+    flux_errs_binned = bin_data(flux_errs, bin_size = bin_size) / np.sqrt(bin_size)
+    
+    full_model_binned = bin_data(full_model, bin_size = bin_size)
+    physical_model_binned = bin_data(physical_model, bin_size = bin_size)
+    line_model_binned = bin_data(line_model, bin_size = bin_size)
+    sensitivity_map_binned = bin_data(sensitivity_map, bin_size = bin_size)
+    weirdness_binned = bin_data(weirdness, bin_size = bin_size) if type(weirdness) is np.ndarray else 1.0
+    
+    std_res = np.std(fluxes_binned-full_model_binned)
+    
+    # fig, (ax1, ax2, ax3) = plt.subplots(nrows=3, figsize=(20,20), sharex=True)
+    # Set up the axes with gridspec
+    fig = plt.figure(figsize=figsize)
+    grid = plt.GridSpec(6, 6, hspace=hspace, wspace=0.0)
+    
+    raw_scat = fig.add_subplot(grid[:2, :-1])
+    raw_hist = fig.add_subplot(grid[:2, -1], xticklabels=[], sharey=raw_scat)
+    raw_hist.yaxis.tick_right()
+    
+    res_scat = fig.add_subplot(grid[2:4, :-1])
+    res_hist = fig.add_subplot(grid[2:4, -1], xticklabels=[], sharey=res_scat)
+    res_hist.yaxis.tick_right()
+    
+    phy_scat = fig.add_subplot(grid[4:, :-1])
+    phy_hist = fig.add_subplot(grid[4:, -1], sharey=phy_scat)#, xticklabels=[]
+    phy_hist.yaxis.tick_right()
+    
+    # Raw Flux Plots
+    sub_ax_split(times_binned - times.mean(), ppm*(full_model_binned-1), [raw_scat, raw_hist], color=color_cycle[0], label='Binned Normalized Flux')
+    raw_scat.errorbar(times_binned - times.mean(), ppm*(fluxes_binned-1), yerr=ppm*flux_errs_binned, fmt='o', color = color_cycle[1],ms=2, label='Full Initial Model', zorder=0, alpha=0.5)
+    raw_scat.set_title('Binned Normalized Flux from {} - {}; {}; {}; {}; {}; {}'.format('Init', planet_name, channel, staticRad, 
+                                                                                   varRad, method, plot_name), **title_kwargs)
+    raw_scat.set_xlabel('Time [days]', **label_kwargs)
+    raw_scat.set_ylabel('Normalized Flux [ppm]', **label_kwargs)
+    
+    # Residual Flux Plots
+    yhist, xhist, _ = sub_ax_split(times_binned - times.mean(), ppm*(fluxes_binned-full_model_binned), [res_scat, res_hist], color=color_cycle[4], returnHist=True)
+    res_scat.set_title('Residuals from {} - {}; {}; {}; {}; {}; {}'.format('Init', planet_name, channel, staticRad, varRad, method, plot_name), **title_kwargs)
+    res_scat.set_xlabel('Time [days]', **label_kwargs)
+    res_scat.set_ylabel('Residuals [ppm]', **label_kwargs)
+    res_scat.set_ylim(-ppm*nSig*std_res, ppm*nSig*std_res)
+    
+    res_hist.annotate('{:.0f} ppm'.format(np.ceil(ppm*std_res)), (0.1*yhist.max(), np.ceil( 1.1*ppm*std_res)), fontsize=label_kwargs['fontsize'], color='indigo')
+    res_hist.annotate('{:.0f} ppm'.format(np.ceil(ppm*std_res)), (0.1*yhist.max(), np.ceil(-1.5*ppm*std_res)), fontsize=label_kwargs['fontsize'], color='indigo')
+    res_hist.axhline( ppm*std_res, ls='--', color='indigo')
+    res_hist.axhline(-ppm*std_res, ls='--', color='indigo')
+    
+    # Physics Only Plots
+    sub_ax_split(times_binned - times.mean(), ppm*(fluxes_binned / sensitivity_map_binned / line_model_binned / weirdness_binned - 1.0), [phy_scat, phy_hist], color=color_cycle[0])
+    phy_scat.plot(times_binned - times.mean(), ppm*(physical_model_binned / line_model_binned - 1.0), color=color_cycle[1])
+    phy_scat.axhline(1.0, ls='--', color=color_cycle[2])
+    phy_scat.set_title('Physics Only from {} - {}; {}; {}; {}; {}; {}'.format('Init', planet_name, channel, staticRad, varRad, method, plot_name), **title_kwargs)
+    phy_scat.set_xlabel('Time [days]', **label_kwargs)
+    phy_scat.set_ylabel('Residuals [ppm]', **label_kwargs)
+    phy_scat.set_ylim(-ppm*nSig*std_res, ppm*nSig*std_res)
+    
+    for tick in phy_scat.xaxis.get_major_ticks(): tick.label.set_fontsize(label_kwargs['fontsize'])
+    
+    for tick in raw_scat.yaxis.get_major_ticks(): tick.label1.set_fontsize(label_kwargs['fontsize'])
+    for tick in res_scat.yaxis.get_major_ticks(): tick.label1.set_fontsize(label_kwargs['fontsize'])
+    for tick in phy_scat.yaxis.get_major_ticks(): tick.label1.set_fontsize(label_kwargs['fontsize'])
+    for tick in raw_hist.yaxis.get_major_ticks(): tick.label2.set_fontsize(label_kwargs['fontsize'])
+    for tick in res_hist.yaxis.get_major_ticks(): tick.label2.set_fontsize(label_kwargs['fontsize'])
+    for tick in phy_hist.yaxis.get_major_ticks(): tick.label2.set_fontsize(label_kwargs['fontsize'])
+    
+    if save_now: 
+        plot_save_name = '{}_{}_{}_{}_{}_{}_fit_residuals_physics_{}.png'.format(planet_name.replace(' b','b'), channel, staticRad, 
+                                                                                     varRad, method, plot_name, time_stamp)
+        
+        print('Saving Initial Fit Residuals Plot to {}'.format(plot_save_name))
+        fig.savefig(save_dir + plot_save_name)
+    
+    if returnAx: return raw_scat, raw_hist, res_scat, res_hist, phy_scat, phy_hist

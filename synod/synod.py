@@ -233,7 +233,7 @@ def residuals_func(model_params, times, xcenters, ycenters, fluxes, flux_errs, k
     if testing_model: return physical_model
     
     # compute the systematics model
-    assert (method.lower() == 'bliss' or method.lower() == 'krdata' or method.lower() == 'pld'), "Invalid method."
+    assert ('bliss' in method.lower() or  'krdata' in method.lower() or 'pld' in method.lower()), "No valid method selected."
     residuals = fluxes / physical_model
     
     sensitivity_map = models.compute_sensitivity_map(model_params=model_params, 
@@ -272,7 +272,7 @@ def generate_best_fit_solution(model_params, times, xcenters, ycenters, fluxes, 
                                 eclipse_option = eclipse_option, return_case='dict')
     
     # compute the systematics model
-    assert (method.lower() == 'bliss' or method.lower() == 'krdata' or method.lower() == 'pld'), "Invalid method."
+    assert ('bliss' in method.lower() or  'krdata' in method.lower() or 'pld' in method.lower()), "No valid method selected."
     
     residuals = fluxes / output['physical_model']
     sensitivity_map = models.compute_sensitivity_map(model_params=model_params, method=method, xcenters=xcenters, ycenters=ycenters, 
