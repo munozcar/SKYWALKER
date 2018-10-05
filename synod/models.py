@@ -58,8 +58,6 @@ def transit_model_func(model_params, times, init_t0=0.0, ldtype='quadratic', tra
     
     m_eclipse = batman.TransitModel(bm_params, times, transittype=transitType) # initializes model
     
-    # oot_offset = model_params['night_flux'].value if transitType.lower() == 'secondary' else 0.0
-    # print(transitType, oot_offset)
     return m_eclipse.light_curve(bm_params)# + oot_offset
 
 eclipse_model_func = partial(transit_model_func, transitType='secondary')
@@ -133,8 +131,6 @@ def phase_curve_func(model_params, times, init_t0):
     #   but the cosine function minimizes at -cos_amplitude / 2
     # 
     # This form ensures that the minimum phase curve will always be exactly 1.0
-    # print(model_params['night_flux'].value,model_params['edepth'].value, model_params['night_flux'].value/model_params['edepth'].value)
-    
     return phase_curve + 1.0 - phase_curve.min() + abs(model_params['night_flux'].value)
 
 def inc2b(inc, aRs, e = 0, w = 0):
