@@ -184,8 +184,8 @@ def sub_ax_split(x, y, axs, markersize=5, alpha=0.5, lw=0, mew=0, bins=100, hist
 
 def plot_fit_residuals_physics(times, fluxes, flux_errs, model_set, planet_name='', channel='', staticRad='', 
                                     varRad='', method='', plot_name='', time_stamp='', nSig=3, save_now=False, 
-                                    label_kwargs={}, title_kwargs={}, color_cycle = None, hspace=1.0, figsize=None,
-                                    markersize=5, alpha=0.5, lw=0, mew=0, bins=100, returnAx=False, save_dir=''):
+                                    label_kwargs={}, title_kwargs={}, color_cycle = None, hspace=3.0, figsize=None,
+                                    markersize=1, alpha=1, lw=0.5, mew=0, bins=100, returnAx=False, save_dir=''):
     
     if 'fontsize' not in title_kwargs.keys(): title_kwargs['fontsize'] = 5
     
@@ -220,23 +220,24 @@ def plot_fit_residuals_physics(times, fluxes, flux_errs, model_set, planet_name=
     fig = plt.figure(figsize=figsize)
     grid = plt.GridSpec(6, 6, hspace=hspace, wspace=0.0)
     
-    raw_scat = fig.add_subplot(grid[:2, :-1])
+    raw_scat = fig.add_subplot(grid[:2, :-1], xticklabels=[])
     raw_hist = fig.add_subplot(grid[:2, -1], xticklabels=[], sharey=raw_scat)
     raw_hist.yaxis.tick_right()
     
-    res_scat = fig.add_subplot(grid[2:4, :-1])
+    res_scat = fig.add_subplot(grid[2:4, :-1], xticklabels=[])
     res_hist = fig.add_subplot(grid[2:4, -1], xticklabels=[], sharey=res_scat)
     res_hist.yaxis.tick_right()
     
     phy_scat = fig.add_subplot(grid[4:, :-1])
-    phy_hist = fig.add_subplot(grid[4:, -1], sharey=phy_scat)#, xticklabels=[]
+    phy_hist = fig.add_subplot(grid[4:, -1], sharey=phy_scat, xticklabels=[])
     phy_hist.yaxis.tick_right()
     
     # Raw Flux Plots
     sub_ax_split(times_binned - times.mean(), ppm*(full_model_binned-1), [raw_scat, raw_hist], color=color_cycle[0], label='Binned Normalized Flux',
                             markersize=markersize, alpha=alpha, lw=lw, mew=mew, bins=bins)
     
-    raw_scat.errorbar(times_binned - times.mean(), ppm*(fluxes_binned-1), yerr=ppm*flux_errs_binned, fmt='o', color = color_cycle[1],ms=2, label='Full Initial Model', zorder=0, alpha=0.5)
+    raw_scat.errorbar(times_binned - times.mean(), ppm*(fluxes_binned-1), yerr=ppm*flux_errs_binned, fmt='.', mew=0,
+                        color = color_cycle[1], lw=lw, markersize=markersize, label='Full Initial Model', zorder=0, alpha=0.5)
     raw_scat.set_title('Binned Normalized Flux from {} - {}; {}; {}; {}; {}; {}'.format('Init', planet_name, channel, staticRad, 
                                                                                    varRad, method, plot_name), **title_kwargs)
     raw_scat.set_xlabel('Time [days]', **label_kwargs)
@@ -260,8 +261,8 @@ def plot_fit_residuals_physics(times, fluxes, flux_errs, model_set, planet_name=
     sub_ax_split(times_binned - times.mean(), ppm*(fluxes_binned / sensitivity_map_binned / line_model_binned / weirdness_binned - 1.0), [phy_scat, phy_hist], color=color_cycle[0],
                             markersize=markersize, alpha=alpha, lw=lw, mew=mew, bins=bins)
     
-    phy_scat.plot(times_binned - times.mean(), ppm*(physical_model_binned / line_model_binned - 1.0), color=color_cycle[1])
-    phy_scat.axhline(1.0, ls='--', color=color_cycle[2])
+    phy_scat.plot(times_binned - times.mean(), ppm*(physical_model_binned / line_model_binned - 1.0), color=color_cycle[1], zorder=100)
+    phy_scat.axhline(0.0, ls='--', color=color_cycle[2])
     phy_scat.set_title('Physics Only from {} - {}; {}; {}; {}; {}; {}'.format('Init', planet_name, channel, staticRad, varRad, method, plot_name), **title_kwargs)
     phy_scat.set_xlabel('Time [days]', **label_kwargs)
     phy_scat.set_ylabel('Residuals [ppm]', **label_kwargs)

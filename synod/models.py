@@ -3,6 +3,8 @@ import numpy as np
 from . import bliss
 from . import utils
 from . import krdata as kr
+
+from functools import partial
 from statsmodels.robust import scale
 from sklearn.decomposition import PCA, FastICA
 from sklearn.preprocessing import StandardScaler
@@ -59,6 +61,8 @@ def transit_model_func(model_params, times, init_t0=0.0, ldtype='quadratic', tra
     # oot_offset = model_params['night_flux'].value if transitType.lower() == 'secondary' else 0.0
     # print(transitType, oot_offset)
     return m_eclipse.light_curve(bm_params)# + oot_offset
+
+eclipse_model_func = partial(transit_model_func, transitType='secondary')
 
 def line_model_func_multi(model_params, ntransits, transit_indices, times):
     intercepts = []
@@ -133,14 +137,47 @@ def phase_curve_func(model_params, times, init_t0):
     
     return phase_curve + 1.0 - phase_curve.min() + abs(model_params['night_flux'].value)
 
-def trapezoid_model(model_params, times, init_t0, include_transit = True, 
-                        include_eclipse = True, include_phase_curve = True, 
-                        include_polynomial = True, subtract_edepth = True, 
-                        return_case = None):
+def inc2b(inc, aRs, e = 0, w = 0):
+    #convert_inc_to_b
+    if e == 0:
+        return aRs * cos(inc)
+    elif w == 0:
+        return aRs * cos(inc) * (1 - e*e)
+    else:
+        return aRs * cos(inc) * (1 - e*e) / (1.0 - e*sin(w))
+
+def transit_duration(period, aprs, rprs, inc):
+    ''' Compute the transit duration from tangent (t1) to tangent (t4)
+    '''
     
-    eclipse_model = transit_model_func(model_params, times, init_t0, transitType='secondary') if include_eclipse else 1.0
+    # circular orbits only for now
+    b_imp = inc2b(inc, aprs)
     
-    ecl_bottom = eclipse_model == eclipse_model.min()
+    out_sin = period/np.pi
+    in_sin = np.sqrt((1+rprs)**2 - b_imp) / aprs / np.sin(inc)
+    
+    return out_sin * np.arcsin(in_sin)
+
+def transit_full(period, aprs, rprs, inc):
+    ''' Compute the transit duration at full coverage, from t2 to t3
+    '''
+    
+    # circular orbits only for now
+    b_imp = inc2b(inc, aprs)
+    
+    out_sin = period/np.pi
+    in_sin = np.sqrt((1-rprs)**2 - b_imp) / aprs / np.sin(inc)
+    
+    return out_sin * np.arcsin(in_sin)
+
+def trapezoid_model(model_params, times, init_t0, delta_eclipse_time=0.0, eclipse_model=None):
+    
+    if eclipse_model is None: 
+        del delta_eclipse_time
+        delta_eclipse_time = 0.0 # reset to avoid later double dipping on the shift in eclipse location
+        eclipse_model = eclipse_model_func(model_params, times, init_t0)
+    
+    ecl_bottom = eclipse_model < eclipse_model.min() + ftol
     in_eclipse = eclipse_model < eclipse_model.max()
     
     eclipse0 = in_eclipse * (times < times.mean())
@@ -163,14 +200,14 @@ def trapezoid_model(model_params, times, init_t0, include_transit = True,
     y3 = 1 #- model_params['edepth'].value
     y4 = 1.0 + model_params['edepth'].value
     
-    x1_0 = times[t1_0]
-    x2_0 = times[t2_0]
-    x1_1 = times[t1_1]
-    x2_1 = times[t2_1]
-    x3_0 = times[t3_0]
-    x4_0 = times[t4_0]
-    x3_1 = times[t3_1]
-    x4_1 = times[t4_1]    
+    x1_0 = times[t1_0] + delta_eclipse_time
+    x2_0 = times[t2_0] + delta_eclipse_time
+    x1_1 = times[t1_1] + delta_eclipse_time
+    x2_1 = times[t2_1] + delta_eclipse_time
+    x3_0 = times[t3_0] + delta_eclipse_time
+    x4_0 = times[t4_0] + delta_eclipse_time
+    x3_1 = times[t3_1] + delta_eclipse_time
+    x4_1 = times[t4_1] + delta_eclipse_time
     
     ingress_slope_0 = (y2 - y1) / (x2_0 - x1_0)
     ingress_slope_1 = (y2 - y1) / (x2_1 - x1_1)
