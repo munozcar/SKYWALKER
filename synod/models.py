@@ -365,3 +365,41 @@ def add_pld_params(model_params, fluxes, pld_intensities,
     if verbose: [print('{:5}: {}'.format(val.name, val.value)) for val in model_params.values() if 'pld' in val.name.lower()];
     
     return model_params, pld_intensities.T
+
+def compute_pld_vectors(fluxes, pld_intensities, 
+                    n_pld = 9, order=3, add_unity = True, 
+                    do_pca=True, do_ica=False, do_std=True, 
+                    pca_cut=False, n_ppm = 1.0, start_unity=False, 
+                    verbose=False):
+    
+    # Make a local copy
+    pld_intensities = pld_intensities.copy()
+    
+    if len(pld_intensities) != n_pld * order: pld_intensities = np.vstack([list(pld_intensities**k) for k in range(1,order+1)])
+    
+    # check that the second set is the square of the first set, and so onself.
+    for k in range(order): assert(np.allclose(pld_intensities[:n_pld]**(k+1), pld_intensities[k*n_pld:(k+1)*n_pld]))
+    
+    if do_pca or do_ica: do_std = True
+    
+    stdscaler = StandardScaler()
+    pld_intensities = stdscaler.fit_transform(pld_intensities.T) if do_std else pld_intensities.T
+    
+    if do_pca:
+        pca = PCA()
+        
+        pld_intensities = pca.fit_transform(pld_intensities)
+        
+        evrc = pca.explained_variance_ratio_.cumsum()
+        n_pca = np.where(evrc > 1.0-n_ppm/ppm)[0].min()
+        if pca_cut: pld_intensities = pld_intensities[:,:n_pca]
+    
+    if do_ica:
+        ica = FastICA()
+        pld_intensities = ica.fit_transform(pld_intensities)
+    
+    if add_unity: pld_intensities = np.vstack([pld_intensities.T, np.ones(pld_intensities.shape[0])]).T
+    
+    n_pld_out = n_pca if do_pca and pca_cut else n_pld*order
+    
+    return pld_intensities.T

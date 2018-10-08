@@ -138,6 +138,7 @@ setup(name=PACKAGENAME,
       cmdclass=cmdclassd,
       zip_safe=False,
       use_2to3=False,
+      #install_requires = ['numpy', 'scipy', 'corner', 'lmfit-py', 'emcee'],
       entry_points=entry_points,
       python_requires='>={}'.format(__minimum_python_version__),
       **package_info

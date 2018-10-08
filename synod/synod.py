@@ -228,16 +228,21 @@ def residuals_func(model_params, times, xcenters, ycenters, fluxes, flux_errs, k
                     include_eclipse = True, include_phase_curve = True, include_polynomial = True, 
                     testing_model = False, eclipse_option = 'trapezoid', use_trap = False, verbose=False):
     
+    # start = time()
     physical_model = compute_full_model(model_params, times, include_transit = include_transit, 
                         include_eclipse = include_eclipse, include_phase_curve = include_phase_curve, 
                         include_polynomial = include_polynomial, eclipse_option = eclipse_option, verbose=verbose)
-    
+    # print('1', time()-start)
     if testing_model: return physical_model
     
     # compute the systematics model
+    # start = time()
     assert ('bliss' in method.lower() or  'krdata' in method.lower() or 'pld' in method.lower()), "No valid method selected."
+    # print('2', time()-start)
+    # start = time()
     residuals = fluxes / physical_model
-    
+    # print('3', time()-start)
+    # start = time()
     sensitivity_map = models.compute_sensitivity_map(model_params=model_params, 
                                                      method=method, 
                                                      xcenters=xcenters, 
@@ -251,16 +256,18 @@ def residuals_func(model_params, times, xcenters, ycenters, fluxes, flux_errs, k
                                                      gw_kdtree=gw_kdtree, 
                                                      pld_intensities=pld_intensities, 
                                                      model=physical_model)
-    
+    # print('4', time()-start)
+    # start = time()
     if 't_start' in model_params.keys() and 'weirdslope' in model_params.keys() and 'weirdintercept' in model_params.keys():
         weirdness = np.ones(times.size)
         weirdness[times - times.mean() > model_params['t_start']] = model_params['weirdslope']*(times[times - times.mean() > model_params['t_start']]-times.mean()) \
                                                                   + model_params['weirdintercept']
     else:
         weirdness = 1.0
-    
+    # print('5', time()-start)
+    # start = time()
     model = physical_model*sensitivity_map*weirdness
-    
+    # print('6', time()-start)
     return (model - fluxes) / flux_errs 
 
 def generate_best_fit_solution(model_params, times, xcenters, ycenters, fluxes, knots, keep_inds, 
