@@ -12,18 +12,18 @@ conf = ConfigParser()
 conf.read(['setup.cfg'])
 metadata = dict(conf.items('metadata'))
 
-PACKAGENAME = metadata.get('package_name', 'synod')
-DESCRIPTION = metadata.get('description', 'SYNOD')
+PACKAGENAME = metadata.get('package_name', 'skywalker')
+DESCRIPTION = metadata.get('description', 'Spitzer Key Yield With All that Lightcurve Exoplanet Research')
 AUTHOR = metadata.get('author', 'Carlos Munoz, Jonathan Fraine, Kevin Stevenson')
 AUTHOR_EMAIL = metadata.get('author_email', '')
 LICENSE = metadata.get('license', 'unknown')
-URL = metadata.get('url', 'https://github.com/munozcar/Spitzer-SYNOD')
+URL = metadata.get('url', 'https://github.com/munozcar/SKYWALKER')
 __minimum_python_version__ = metadata.get("minimum_python_version", "3.5")
 
 # Enforce Python version check - this is the same check as in __init__.py but
 # this one has to happen before importing ah_bootstrap.
 if sys.version_info < tuple((int(val) for val in __minimum_python_version__.split('.'))):
-    sys.stderr.write("ERROR: synod requires Python {} or later\n".format(__minimum_python_version__))
+    sys.stderr.write("ERROR: skywalker requires Python {} or later\n".format(__minimum_python_version__))
     sys.exit(1)
 
 # Import ah_bootstrap after the python version validation

@@ -1,4 +1,4 @@
-SYNOD
+SKYWALKER
 -----
 
 .. image:: http://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat
@@ -21,7 +21,7 @@ more information.
 Contributing
 ------------
 
-We love contributions! SYNOD is open source,
+We love contributions! SKYWALKER is open source,
 built on open source, and we'd love to have you hang out in our community.
 
 **Imposter syndrome disclaimer**: We want your help. No, really.
@@ -47,5 +47,5 @@ the errors and assumptions that seasoned contributors have glossed over.
 *This disclaimer was originally written by
 `Adrienne Lowe <https://github.com/adriennefriend>`_ for a
 `PyCon talk <https://www.youtube.com/watch?v=6Uj746j9Heo>`_, and was adapted by
-SYNOD based on its use in the README file for the
+SKYWALKER based on its use in the README file for the
 `MetPy project <https://github.com/Unidata/MetPy>`_.*
