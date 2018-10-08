@@ -2,6 +2,8 @@ from scipy import spatial
 from sklearn.externals import joblib
 from pylab import *;
 
+from tqdm import tqdm
+
 from . import bliss
 from . import krdata as kr
 
@@ -182,14 +184,167 @@ def sub_ax_split(x, y, axs, markersize=5, alpha=0.5, lw=0, mew=0, bins=100, hist
     
     if returnHist: return yhist, xhist, patches
 
+def bin_array(arr, uncs = None,  binsize=100, KeepTheChange = False):
+    ''' From `spitzer_helper_functions`
+        
+        Given nSize = size(time), nCols = binsize, nRows = nSize / nCols
+
+            this function reshapes the 1D array into a new 2D array of dimension
+                nCols x nRows or binsize x (nSize / nCols)
+
+            after which, the function collapses the array into a new 1D array by taking the median
+
+        Because most input arrays cannot be subdivided into an even number of subarrays of size `binsize`
+            we actually first slice the array into a 1D array of size `nRows*binsize`.
+
+            The mean of the remaining elements from the input array is then taken as the final element
+                in the output array
+
+    '''
+    from numpy import mean, std, sqrt
+    
+    nSize   = arr.size
+    nCols   = int(nSize / binsize)
+    nRows   = binsize
+
+    EqSize  = nRows*nCols
+    
+    useArr  = arr[:EqSize].copy()   # this array can be subdivided evenly
+    
+    if uncs is not None:
+        # weighted mean profile
+        useUncs = uncs[:EqSize].copy()   # this array can be subdivided evenly
+        binArr  = median((useArr / useUncs).reshape(nCols, nRows).mean(axis=1)/ useUncs.reshape(nCols, nRows))
+        stdArr  = median((useArr / useUncs).reshape(nCols, nRows).std(axis=1) / useUncs.reshape(nCols, nRows))
+        
+        if KeepTheChange:
+            SpareArr    = arr[EqSize:].copy()
+            SpareUncs   = uncs[EqSize:].copy()
+
+            binTC       = median((SpareArr / SpareUncs)) / median(SpareUncs.reshape(nCols, nRows))
+            stdTC       = median((SpareArr / SpareUncs)) / median(SpareUncs.reshape(nCols, nRows))
+
+            binArr  = concatenate((binArr, [binTC]))
+            stdArr  = concatenate((stdArr, [stdTC]))
+    else:
+        # standard mean profile
+        binArr  = mean(useArr.reshape(nCols, nRows),axis=1)
+        stdArr  = std(useArr.reshape(nCols, nRows),axis=1) / sqrt(nSize)
+        
+        if KeepTheChange:
+            SpareArr    = arr[EqSize:].copy()
+            binTC       = median(SpareArr)
+            stdTC       = std(SpareArr)
+
+            binArr  = concatenate((binArr, [binTC]))
+            stdArr  = concatenate((stdArr, [stdTC]))
+
+    return binArr, stdArr
+
+def rms_vs_binsize(residuals):
+    ''' Compute the RMS (std) as a function of the binsize
+    
+        Inputs
+        ------
+            
+            residuals (ndarray): the array over which to compute the rms
+                                    nominally, this array should be approximately "random noise" 
+                                    and free of as much red noise as is possible to compute
+        Returns
+        -------
+            rms_v_bs (ndarray): the computed RMS as a function of binsize.
+                                    the minimum binsize is "no binning" (binsize=1)
+                                    the maximum binsize is the full array (binsize = residuals.size )
+            
+            bins_arr (ndarry): an array containing the bins sizes over which `rms_v_bs` was computer
+    '''
+    min_bin = 2
+    max_bin = residuals.size
+    
+    rms_v_bs = np.zeros(residuals.size-1)
+    rms_v_bs[0] = residuals.std()
+    
+    bins_arr = np.ones(max_bin-1)
+    
+    for k,binsize in tqdm(enumerate(range(min_bin, max_bin)), total=max_bin-min_bin):
+        n_points_per_bin = residuals.size // binsize
+        res_bin, res_unc = bin_array(residuals, binsize=binsize)
+        rms_v_bs[k+1] = res_bin.std() #/ np.sqrt(n_points_per_bin)
+        bins_arr[k+1] = binsize
+    
+    return rms_v_bs / rms_v_bs[0], bins_arr, 
+
+def plot_rms_vs_binsize(model_set, fluxes, model_rms_v_bs=None, bins_arr=None, times=None, color=None, label=None, zorder=None, alpha = None, ax=None):
+    ''' Plots the RMS vs Binsize
+        
+            Inputs
+            ------
+                
+                model_set (dict): output from `synod.generate_best_fit_solution`; dictionary of computed models from parameters
+    
+                fluxes (ndarray): raw photometry by which to compare the computed models
+                
+                model_rms_v_bs (ndarray or None): (optional) a precomputed output of `rms_vs_binsize`
+                
+                bins_arr (ndarray or None): (optional) a precomputed output of `rms_vs_binsize`
+                
+                times (ndarray or None): (optional) the times array to compare timescales -- Does not work yet
+                
+                label (string or None): (optional) a label for this rms_vs_binsize, when
+                
+                ax (matplotlib.axes or None): (optional) an axes handle on which to add a new rms_vs_binsize line
+            
+            Returns
+            -------
+                
+                ax (matplotlib.axes): the axes handle that was used to plot a new line (either generated here or received as input)
+    '''
+    
+    if ax is None: 
+        fig, ax = plt.subplots()
+    else:
+        try:
+            ax.lines.pop() # Remove axvline -- will be added again here
+            ax.lines.pop() # Remove Gaussian theory model -- will be added again here
+        except:
+            pass # This is the first plot
+    
+    transit_duration = np.where(model_set['transit_model'] < model_set['transit_model'].max())[0]
+    transit_duration = transit_duration.max() - transit_duration.min()
+    
+    if model_rms_v_bs is None or bins_arr is None: 
+        full_model = model_set['full_model']
+        residuals = fluxes - full_model
+        model_rms_v_bs, bins_arr = rms_vs_binsize(residuals)
+    
+    theory_gauss = 1/np.sqrt(bins_arr)
+    theory_gauss /= theory_gauss[0]
+    
+    if label is not None:
+        label = label + ' {:.2f}x'.format((model_rms_v_bs / theory_gauss)[transit_duration])
+    
+    if times is not None: 
+        print('This doent work!')
+        bins_arr = times[np.int32(bins_arr)]
+        transit_duration = times[np.int32(transit_duration)]
+    
+    ax.loglog(bins_arr, model_rms_v_bs, lw=1, color=color, label=label, zorder=zorder, alpha=alpha);
+    ax.loglog(bins_arr, theory_gauss, color='black', ls='--', lw=1, label='Gaussian Residuals');
+    ax.axvline(transit_duration, color='darkgrey', ls='--', lw=1)
+    ax.set_ylim(theory_gauss.min()/1.1,1.1*theory_gauss.max())
+    
+    ax.legend(loc=0)
+    
+    return ax
+
 def plot_fit_residuals_physics(times, fluxes, flux_errs, model_set, planet_name='', channel='', staticRad='', 
-                                    varRad='', method='', plot_name='', time_stamp='', nSig=3, save_now=False, 
-                                    label_kwargs={}, title_kwargs={}, color_cycle = None, hspace=1.0, figsize=(30, 15),
-                                    returnAx=False, save_dir=''):
+                                    varRad='', method='', plot_name='', time_stamp='', nSig=3, save_now=False, bin_size=10,
+                                    label_kwargs={}, title_kwargs={}, color_cycle = None, hspace=3.0, figsize=None,
+                                    markersize=1, alpha=1, lw=0.5, mew=0, bins=100, returnAx=False, save_dir=''):
     
-    if 'fontsize' not in title_kwargs.keys(): title_kwargs['fontsize'] = 20
+    if 'fontsize' not in title_kwargs.keys(): title_kwargs['fontsize'] = 5
     
-    if 'fontsize' not in label_kwargs.keys(): label_kwargs['fontsize'] = 20
+    if 'fontsize' not in label_kwargs.keys(): label_kwargs['fontsize'] = 5
     
     if color_cycle is None: color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
     
@@ -200,8 +355,6 @@ def plot_fit_residuals_physics(times, fluxes, flux_errs, model_set, planet_name=
     physical_model = model_set['physical_model']
     sensitivity_map = model_set['sensitivity_map']
     weirdness = model_set['weirdness']
-    
-    bin_size = 10
     
     times_binned = bin_data(times, bin_size = bin_size)
     fluxes_binned = bin_data(fluxes, bin_size = bin_size)
@@ -220,28 +373,33 @@ def plot_fit_residuals_physics(times, fluxes, flux_errs, model_set, planet_name=
     fig = plt.figure(figsize=figsize)
     grid = plt.GridSpec(6, 6, hspace=hspace, wspace=0.0)
     
-    raw_scat = fig.add_subplot(grid[:2, :-1])
+    raw_scat = fig.add_subplot(grid[:2, :-1], xticklabels=[])
     raw_hist = fig.add_subplot(grid[:2, -1], xticklabels=[], sharey=raw_scat)
     raw_hist.yaxis.tick_right()
     
-    res_scat = fig.add_subplot(grid[2:4, :-1])
+    res_scat = fig.add_subplot(grid[2:4, :-1], xticklabels=[])
     res_hist = fig.add_subplot(grid[2:4, -1], xticklabels=[], sharey=res_scat)
     res_hist.yaxis.tick_right()
     
     phy_scat = fig.add_subplot(grid[4:, :-1])
-    phy_hist = fig.add_subplot(grid[4:, -1], sharey=phy_scat)#, xticklabels=[]
+    phy_hist = fig.add_subplot(grid[4:, -1], sharey=phy_scat, xticklabels=[])
     phy_hist.yaxis.tick_right()
     
     # Raw Flux Plots
-    sub_ax_split(times_binned - times.mean(), ppm*(full_model_binned-1), [raw_scat, raw_hist], color=color_cycle[0], label='Binned Normalized Flux')
-    raw_scat.errorbar(times_binned - times.mean(), ppm*(fluxes_binned-1), yerr=ppm*flux_errs_binned, fmt='o', color = color_cycle[1],ms=2, label='Full Initial Model', zorder=0, alpha=0.5)
+    sub_ax_split(times_binned - times.mean(), ppm*(full_model_binned-1), [raw_scat, raw_hist], color=color_cycle[0], label='Binned Normalized Flux',
+                            markersize=markersize, alpha=alpha, lw=lw, mew=mew, bins=bins)
+    
+    raw_scat.errorbar(times_binned - times.mean(), ppm*(fluxes_binned-1), yerr=ppm*flux_errs_binned, fmt='.', mew=0,
+                        color = color_cycle[1], lw=lw, markersize=markersize, label='Full Initial Model', zorder=0, alpha=0.5)
     raw_scat.set_title('Binned Normalized Flux from {} - {}; {}; {}; {}; {}; {}'.format('Init', planet_name, channel, staticRad, 
                                                                                    varRad, method, plot_name), **title_kwargs)
     raw_scat.set_xlabel('Time [days]', **label_kwargs)
     raw_scat.set_ylabel('Normalized Flux [ppm]', **label_kwargs)
     
     # Residual Flux Plots
-    yhist, xhist, _ = sub_ax_split(times_binned - times.mean(), ppm*(fluxes_binned-full_model_binned), [res_scat, res_hist], color=color_cycle[4], returnHist=True)
+    yhist, xhist, _ = sub_ax_split(times_binned - times.mean(), ppm*(fluxes_binned-full_model_binned), [res_scat, res_hist], color=color_cycle[4], returnHist=True,
+                            markersize=markersize, alpha=alpha, lw=lw, mew=mew, bins=bins)
+    
     res_scat.set_title('Residuals from {} - {}; {}; {}; {}; {}; {}'.format('Init', planet_name, channel, staticRad, varRad, method, plot_name), **title_kwargs)
     res_scat.set_xlabel('Time [days]', **label_kwargs)
     res_scat.set_ylabel('Residuals [ppm]', **label_kwargs)
@@ -253,9 +411,11 @@ def plot_fit_residuals_physics(times, fluxes, flux_errs, model_set, planet_name=
     res_hist.axhline(-ppm*std_res, ls='--', color='indigo')
     
     # Physics Only Plots
-    sub_ax_split(times_binned - times.mean(), ppm*(fluxes_binned / sensitivity_map_binned / line_model_binned / weirdness_binned - 1.0), [phy_scat, phy_hist], color=color_cycle[0])
-    phy_scat.plot(times_binned - times.mean(), ppm*(physical_model_binned / line_model_binned - 1.0), color=color_cycle[1])
-    phy_scat.axhline(1.0, ls='--', color=color_cycle[2])
+    sub_ax_split(times_binned - times.mean(), ppm*(fluxes_binned / sensitivity_map_binned / line_model_binned / weirdness_binned - 1.0), [phy_scat, phy_hist], color=color_cycle[0],
+                            markersize=markersize, alpha=alpha, lw=lw, mew=mew, bins=bins)
+    
+    phy_scat.plot(times_binned - times.mean(), ppm*(physical_model_binned / line_model_binned - 1.0), color=color_cycle[1], zorder=100)
+    phy_scat.axhline(0.0, ls='--', color=color_cycle[2])
     phy_scat.set_title('Physics Only from {} - {}; {}; {}; {}; {}; {}'.format('Init', planet_name, channel, staticRad, varRad, method, plot_name), **title_kwargs)
     phy_scat.set_xlabel('Time [days]', **label_kwargs)
     phy_scat.set_ylabel('Residuals [ppm]', **label_kwargs)
@@ -274,7 +434,7 @@ def plot_fit_residuals_physics(times, fluxes, flux_errs, model_set, planet_name=
         plot_save_name = '{}_{}_{}_{}_{}_{}_fit_residuals_physics_{}.png'.format(planet_name.replace(' b','b'), channel, staticRad, 
                                                                                      varRad, method, plot_name, time_stamp)
         
-        print('Saving Initial Fit Residuals Plot to {}'.format(plot_save_name))
+        print('Saving Initial Fit Residuals Plot to {}'.format(save_dir + plot_save_name))
         fig.savefig(save_dir + plot_save_name)
     
     if returnAx: return raw_scat, raw_hist, res_scat, res_hist, phy_scat, phy_hist

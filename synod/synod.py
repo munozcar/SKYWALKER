@@ -148,7 +148,7 @@ def compute_full_model(model_params, times, include_transit = True,
                         include_eclipse = True, include_phase_curve = True, 
                         include_polynomial = True, eclipse_option = 'trapezoid',
                         subtract_edepth = True, return_case = None,
-                        use_trap = False):
+                        use_trap = False, verbose = False):
     
     init_t0 = model_params['tCenter']
     
@@ -188,18 +188,20 @@ def compute_full_model(model_params, times, include_transit = True,
             elif eclipse_option == 'trapezoid':
                 phase_curve_model = add_trap_to_phase_curve_model(model_params, times, init_t0, phase_curve_model, eclipse_model)
         else:
-            print('Edepth: {}'.format(model_params['edepth'].value))
+            if verbose: print('Edepth: {}'.format(model_params['edepth'].value))
             mutl_ecl = False
     except Exception as e:
         mutl_ecl = False
         
-        print('\n[WARNING] Failure Occured with {}'.format(str(e)))
-        print('[WARNING] Model Params at Failure were')
-        for val in model_params.values(): 
-            print('\t\t{:11}: {:3}\t[{:5}, {:5}]\t{}'.format(val.name, str(val.value)[:10], str(val.min)[:5], str(val.max)[:5], str(val.vary)))
-        
-        print('\n[WARNING] BATMAN Eclipse Model Mean: {}'.format(eclipse_model.mean()))
+        if verbose: 
+            print('\n[WARNING] Failure Occured with {}'.format(str(e)))
+            print('[WARNING] Model Params at Failure were')
+            for val in model_params.values(): 
+                print('\t\t{:11}: {:3}\t[{:5}, {:5}]\t{}'.format(val.name, str(val.value)[:10], str(val.min)[:5], str(val.max)[:5], str(val.vary)))
+            
+            print('\n[WARNING] BATMAN Eclipse Model Mean: {}'.format(eclipse_model.mean()))
     
+    # If the phase curve does exist (all == 1), then include the eclipse alongside the transit model
     if np.allclose(phase_curve_model, np.ones(phase_curve_model.size)): mutl_ecl = True
     
     # non-systematics model (i.e. (star + planet) / star
@@ -224,18 +226,23 @@ def residuals_func(model_params, times, xcenters, ycenters, fluxes, flux_errs, k
                     method=None, nearIndices=None, ind_kdtree=None, gw_kdtree=None, pld_intensities=None, 
                     x_bin_size  = 0.1, y_bin_size  = 0.1, transit_indices=None, include_transit = True, 
                     include_eclipse = True, include_phase_curve = True, include_polynomial = True, 
-                    testing_model = False, eclipse_option = 'trapezoid', use_trap = False):
+                    testing_model = False, eclipse_option = 'trapezoid', use_trap = False, verbose=False):
     
+    # start = time()
     physical_model = compute_full_model(model_params, times, include_transit = include_transit, 
                         include_eclipse = include_eclipse, include_phase_curve = include_phase_curve, 
-                        include_polynomial = include_polynomial, eclipse_option = eclipse_option)
-    
+                        include_polynomial = include_polynomial, eclipse_option = eclipse_option, verbose=verbose)
+    # print('1', time()-start)
     if testing_model: return physical_model
     
     # compute the systematics model
+    # start = time()
     assert ('bliss' in method.lower() or  'krdata' in method.lower() or 'pld' in method.lower()), "No valid method selected."
+    # print('2', time()-start)
+    # start = time()
     residuals = fluxes / physical_model
-    
+    # print('3', time()-start)
+    # start = time()
     sensitivity_map = models.compute_sensitivity_map(model_params=model_params, 
                                                      method=method, 
                                                      xcenters=xcenters, 
@@ -249,27 +256,30 @@ def residuals_func(model_params, times, xcenters, ycenters, fluxes, flux_errs, k
                                                      gw_kdtree=gw_kdtree, 
                                                      pld_intensities=pld_intensities, 
                                                      model=physical_model)
-    
+    # print('4', time()-start)
+    # start = time()
     if 't_start' in model_params.keys() and 'weirdslope' in model_params.keys() and 'weirdintercept' in model_params.keys():
         weirdness = np.ones(times.size)
         weirdness[times - times.mean() > model_params['t_start']] = model_params['weirdslope']*(times[times - times.mean() > model_params['t_start']]-times.mean()) \
                                                                   + model_params['weirdintercept']
     else:
         weirdness = 1.0
-    
+    # print('5', time()-start)
+    # start = time()
     model = physical_model*sensitivity_map*weirdness
-    
+    # print('6', time()-start)
     return (model - fluxes) / flux_errs 
 
 def generate_best_fit_solution(model_params, times, xcenters, ycenters, fluxes, knots, keep_inds, 
                                 method=None, nearIndices=None, ind_kdtree=None, gw_kdtree=None, 
                                 pld_intensities=None, x_bin_size  = 0.1, y_bin_size  = 0.1, 
                                 transit_indices=None, include_transit = True, include_eclipse = True, 
-                                include_phase_curve = True, include_polynomial = True, eclipse_option = 'trapezoid'):
+                                include_phase_curve = True, include_polynomial = True, eclipse_option = 'trapezoid',
+                                verbose = False):
     
     output = compute_full_model(model_params, times, include_transit = include_transit, include_eclipse = include_eclipse, 
                                 include_phase_curve = include_phase_curve, include_polynomial = include_polynomial, 
-                                eclipse_option = eclipse_option, return_case='dict')
+                                eclipse_option = eclipse_option, return_case='dict', verbose=verbose)
     
     # compute the systematics model
     assert ('bliss' in method.lower() or  'krdata' in method.lower() or 'pld' in method.lower()), "No valid method selected."
