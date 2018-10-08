@@ -177,10 +177,10 @@ def bin_data(data, bin_size):
         init = i*bin_size
     return np.array(binned)
 
-def sub_ax_split(x, y, axs, markersize=5, alpha=0.5, lw=0, mew=0, bins=100, histtype='stepfilled', orientation='horizontal', color='gray', label=None, returnHist=False):
+def sub_ax_split(x, y, axs, markersize=5, alpha=0.5, lw=0, mew=0, points_per_bins=100, histtype='stepfilled', orientation='horizontal', color='gray', label=None, returnHist=False):
     ax_scat, ax_hist = axs
     ax_scat.plot(x, y, '.', color=color, markersize=markersize, alpha=alpha, mew=0, label=label)
-    yhist, xhist, patches = ax_hist.hist(y, bins=bins, histtype=histtype, orientation=orientation, color=color, density=False);
+    yhist, xhist, patches = ax_hist.hist(y, bins=y.size//points_per_bins, histtype=histtype, orientation=orientation, color=color, density=False);
     
     if returnHist: return yhist, xhist, patches
 
