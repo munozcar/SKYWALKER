@@ -280,7 +280,7 @@ def plot_rms_vs_binsize(model_set, fluxes, model_rms_v_bs=None, bins_arr=None, t
             Inputs
             ------
                 
-                model_set (dict): output from `synod.generate_best_fit_solution`; dictionary of computed models from parameters
+                model_set (dict): output from `skywalker.generate_best_fit_solution`; dictionary of computed models from parameters
     
                 fluxes (ndarray): raw photometry by which to compare the computed models
                 

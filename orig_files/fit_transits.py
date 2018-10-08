@@ -15,9 +15,9 @@ from lmfit import Parameters, Minimizer, report_errors
 from scipy import spatial
 from statsmodels.robust import scale
 from time import time
-# SYNOD methods and assisting routines:
+# SKYWALKER methods and assisting routines:
 
-import synod
+import skywalker
 import utils
 import models
 import bliss
@@ -167,7 +167,7 @@ if method.lower() == 'pld':
     print('Initializing PLD coefficients.')
     initialParams = models.add_pld_params(initialParams, fluxes=fluxes, pld_intensities=pld_intensities)
 
-partial_residuals  = partial(synod.residuals_func,
+partial_residuals  = partial(skywalker.residuals_func,
                              times       = times,
                              xcenters    = xcenters,
                              ycenters    = ycenters,
@@ -196,7 +196,7 @@ report_errors(fitResult.params)
 
 print('Establishing the Best Fit Solution')
 
-bf_model_set = synod.generate_best_fit_solution(fitResult.params, times=times, xcenters=xcenters, ycenters=ycenters, fluxes=fluxes, knots=knots, keep_inds=keep_inds, method=method, nearIndices=nearIndices, ind_kdtree=ind_kdtree, gw_kdtree=gw_kdtree, pld_intensities=pld_intensities, x_bin_size=x_bin_size, y_bin_size=y_bin_size, transit_indices=transit_indices)
+bf_model_set = skywalker.generate_best_fit_solution(fitResult.params, times=times, xcenters=xcenters, ycenters=ycenters, fluxes=fluxes, knots=knots, keep_inds=keep_inds, method=method, nearIndices=nearIndices, ind_kdtree=ind_kdtree, gw_kdtree=gw_kdtree, pld_intensities=pld_intensities, x_bin_size=x_bin_size, y_bin_size=y_bin_size, transit_indices=transit_indices)
 
 bf_full_model = bf_model_set['full_model']
 bf_line_model = bf_model_set['line_model']
@@ -253,7 +253,7 @@ if do_mcmc == 'True':
     #
     # plt.show()
 
-    bf_model_set = synod.generate_best_fit_solution(res.params, times=times, xcenters=xcenters, ycenters=ycenters, fluxes=fluxes, knots=knots, keep_inds=keep_inds, method=method, nearIndices=nearIndices, ind_kdtree=ind_kdtree, gw_kdtree=gw_kdtree, pld_intensities=pld_intensities, x_bin_size=x_bin_size, y_bin_size=y_bin_size, transit_indices=transit_indices)
+    bf_model_set = skywalker.generate_best_fit_solution(res.params, times=times, xcenters=xcenters, ycenters=ycenters, fluxes=fluxes, knots=knots, keep_inds=keep_inds, method=method, nearIndices=nearIndices, ind_kdtree=ind_kdtree, gw_kdtree=gw_kdtree, pld_intensities=pld_intensities, x_bin_size=x_bin_size, y_bin_size=y_bin_size, transit_indices=transit_indices)
 
     bf_full_model = bf_model_set['full_model']
     bf_line_model = bf_model_set['line_model']

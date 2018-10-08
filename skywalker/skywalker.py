@@ -1,6 +1,6 @@
 '''
-SYNOD: Spitzer Systematcs Noise Decorrelation. Written by Carlos E. Munoz-Romero and Jonathan D. Fraine, 2018.
-Usage: python synod.py -f photometry_file -p planet_params_file -m method -xb x_bin_size -yb y_bin_size
+SKYWALKER: Spitzer Key Yield With All that Lightcurve Exoplanet Research. 
+Written by Carlos E. Munoz-Romero and Jonathan D. Fraine, 2018.
 '''
 
 # Import internal dependencies and methods.
