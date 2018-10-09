@@ -2,6 +2,8 @@
 
 SKYWALKER: Spitzer Key Yield With All that Lightcurve Exoplanet Research
 
+The Spitzer Space Telescope has a well known intrapixel effect. This sub-pixel sensitivity variation manifests itself as several variations in the photometric flux measured that is dependent on the sub-pixel of the PSF.  That is to say that the PSF walks along the sky and the flux read out varies as a result.
+
 Written and updated by [Carlos Munoz 2018](https://github.com/munozcar) and [Jonathan Fraine 2018](https://github.com/exowanderer)  
 
 BLISS created by [Kevin Stevenson 2010](https://github.com/kevin218/)  
