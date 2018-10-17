@@ -16,7 +16,7 @@ PACKAGENAME = metadata.get('package_name', 'skywalker')
 DESCRIPTION = metadata.get('description', 'Spitzer Key Yield With All that Lightcurve Exoplanet Research')
 AUTHOR = metadata.get('author', 'Carlos Munoz, Jonathan Fraine, Kevin Stevenson')
 AUTHOR_EMAIL = metadata.get('author_email', '')
-LICENSE = metadata.get('license', 'unknown')
+LICENSE = metadata.get('license', 'BSD3')
 URL = metadata.get('url', 'https://github.com/munozcar/SKYWALKER')
 __minimum_python_version__ = metadata.get("minimum_python_version", "3.5")
 
