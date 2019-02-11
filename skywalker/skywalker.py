@@ -236,7 +236,7 @@ def create_starry_lightcurve(planet, star, system, model_params):
 
     return system.lightcurve
 
-def compute_full_models_starry( model_params, times,  planet_input=None,
+def compute_full_models_starry( model_params, times,  planet_info=None,
                                 planet=None, star=None, system=None, lmax=1,
                                 include_polynomial=True, return_case=None,
                                 verbose=False):
@@ -370,7 +370,7 @@ def compute_full_model(model_params, times,
     
     if fit_method is 'starry':
         return compute_full_models_starry( model_params, times,  
-                                    planet_input = planet_input,
+                                    planet_info = planet_info,
                                     planet = planet,
                                     star = star, 
                                     system = system, 
@@ -505,11 +505,16 @@ def chisq_func_scipy(fit_params, fit_param_names, model_params, times, xcenters,
     # Return the ChiSq output
     return np.sum(weighted_residuals**2.)
 
-def generate_best_fit_solution(model_params, times, xcenters, ycenters, fluxes, knots, keep_inds, 
-                                method=None, nearIndices=None, ind_kdtree=None, gw_kdtree=None, 
-                                pld_intensities=None, x_bin_size  = 0.1, y_bin_size  = 0.1, 
-                                transit_indices=None, include_transit = True, include_eclipse = True, 
-                                include_phase_curve = True, include_polynomial = True, eclipse_option = 'trapezoid',
+def generate_best_fit_solution(model_params, times, xcenters, ycenters, fluxes,
+                                knots, keep_inds, planet_info,
+                                method=None, nearIndices=None, ind_kdtree=None,
+                                gw_kdtree=None, pld_intensities=None, 
+                                x_bin_size  = 0.1, y_bin_size  = 0.1, 
+                                transit_indices=None, include_transit = True, 
+                                include_eclipse = True, 
+                                include_phase_curve = True, 
+                                include_polynomial = True, 
+                                eclipse_option = 'trapezoid',
                                 verbose = False):
     
     output = compute_full_model(model_params, times, include_transit = include_transit, include_eclipse = include_eclipse, 
