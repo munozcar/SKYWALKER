@@ -121,14 +121,14 @@ def phase_curve_func(model_params, times, init_t0):
     elif 'sinAmp1' in model_params.keys() and 'cosAmp1' in model_params.keys():
         if 'sinAmp2' in model_params.keys() and 'cosAmp2' in model_params.keys():
             phase_curve = model_params['cosAmp1']*np.cos(ang_freq * (times - t_secondary)) + model_params['sinAmp1']*np.sin(ang_freq * (times - t_secondary)) + \
-                   model_params['cosAmp2']*np.cos(2*ang_freq * (times - t_secondary)) + model_params['sinAmp2']*np.sin(2*ang_freq * (times - t_secondary))
+                           model_params['cosAmp2']*np.cos(2*ang_freq * (times - t_secondary)) + model_params['sinAmp2']*np.sin(2*ang_freq * (times - t_secondary))
         else:
             phase_curve = model_params['cosAmp1']*np.cos(ang_freq * (times - t_secondary)) + model_params['sinAmp1']*np.sin(ang_freq * (times - t_secondary))
     else:
         phase_curve = np.array(0)
     
-    # The `+ 1.0 - phase_curve.min()` term is required because the "phase curve" minimizes to 1.0;
-    #   but the cosine function minimizes at -cos_amplitude / 2
+    # The `+ 1.0 - phase_curve.min()` term is required because the "phase curve" minimizes to 1.0; i.e. the planet+star cannot be less than the star alone;
+    #   but the cosine function minimizes at -cos_amplitude / 2. So we have to modify the function to match the model
     # 
     # This form ensures that the minimum phase curve will always be exactly 1.0
     return phase_curve + 1.0 - phase_curve.min() + abs(model_params['night_flux'].value)
@@ -166,7 +166,8 @@ def transit_full(period, aprs, rprs, inc):
     
     return out_sin * np.arcsin(in_sin)
 
-def trapezoid_model(model_params, times, init_t0, delta_eclipse_time=0.0, eclipse_model=None):
+def trapezoid_model(model_params, times, init_t0, 
+                    delta_eclipse_time=0.0, eclipse_model=None):
     
     if eclipse_model is None: 
         del delta_eclipse_time

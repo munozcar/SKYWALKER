@@ -8,6 +8,8 @@ from . import bliss
 from . import krdata as kr
 from . import utils
 from . import models
+from .models import line_model_func, trapezoid_model, transit_model_func
+from .models import phase_curve_func
 
 # Import external dependencies and methods.
 import numpy as np
@@ -18,6 +20,7 @@ import exoparams
 import json
 import matplotlib
 import matplotlib.pyplot as plt
+
 from os import environ
 from pandas import DataFrame
 from scipy import special
@@ -144,9 +147,133 @@ def add_trap_to_phase_curve_model(model_params, times, init_t0, phase_curve_mode
     
     return output_model
 
-def compute_full_model(model_params, times, include_transit = True, 
+def instantiate_system(planet_input, fpfs=0.0, 
+                        u_params = [0.0, 0.0],
+                        phase_curve_amp_1_0 = 0.0,
+                        phase_curve_amp_1n0 = 0.0,
+                        phase_curve_amp_1p0 = 0.0,
+                        lmax=1, lambda0=90.0):
+    """
+        instantiate the planet :class:``Primary``,
+        :class:``Secondary``, and :class:``System``
+        with or without gradients.
+
+    """
+    try:
+        from starry import kepler
+    except:
+        raise ImportError(
+                '`starry` (github.com/rodluger/starry)'
+                ' is required to run this operation.'
+                ' Try `pip install starry`\n'
+                '     `conda install starry`\n'
+                ' or  `pip install git+https://github.com/rodluger/starry`'
+                )
+
+    if isinstance(planet_input, str):
+        planet_info = exoMAST_API(planet_input)
+    elif isinstance(planet_input, exoMAST_API):
+        planet_info = planet_input
+    else:
+        raise TypeError('`planet_info` must have type of'
+                        ' either `str` or `exoMAST_API`')
+
+    # Instantiate the star
+    star = kepler.Primary()
+
+    star[1] = u_params[0]
+    star[2] = u_params[1]
+
+    # Instantiate the planet
+    planet = kepler.Secondary(lmax=lmax)
+    planet.lambda0 = lambda0 # Mean longitude in degrees at reference time
+    planet.r = planet_info.Rp_Rs # planetary radius in stellar radius
+    planet.L = fpfs # flux from planet relative to star
+    planet.inc = planet_info.inclination # orbital inclination 
+    planet.a = planet_info.a_Rs # orbital distance in stellar radius
+    planet.prot = planet_info.orbital_period # synchronous rotation
+    planet.porb = planet_info.orbital_period # synchronous rotation
+    planet.tref = planet_info.transit_time # MJD for transit center time
+
+    planet.ecc = planet_info.eccentricity # eccentricity of orbit
+    planet.Omega = planet_info.omega # argument of the ascending node
+
+    planet[1,0] = phase_curve_amp_1_0 # Y_1_0
+    planet[1,-1] = phase_curve_amp_1n1 # Y_1n1
+    planet[1,1] = phase_curve_amp_1p1 # Y_1p1
+
+    # Instantiate the system
+    system = kepler.System(star, planet)
+    
+    return star, planet, system
+
+def create_starry_lightcurve(planet, star, system, model_params):
+
+    star[1] = model_params['u1']
+    star[2] = model_params['u2']
+
+    rprs =  np.sqrt(model_params['tdepth'])
+
+    # Instantiate the planet
+    planet = kepler.Secondary(lmax=lmax)
+    planet.lambda0 = lambda0 # Mean longitude in degrees at reference time
+    planet.r = rprs # planetary radius in stellar radius
+    planet.L = model_params['edepth'] # flux from planet relative to star
+    planet.inc = model_params['inclination'] # orbital inclination 
+    planet.a = model_params['aprs'] # orbital distance in stellar radius
+    # planet.prot = model_params['period'] # synchronous rotation
+    planet.porb = model_params['period'] # synchronous rotation
+    planet.tref = model_params['init_t0'] + model_params['deltaTc'] # MJD for transit center time
+
+    planet.ecc = model_params['ecc'] # eccentricity of orbit
+    planet.Omega = model_params['omega'] # argument of the ascending node
+
+    planet[1,-1] = model_params['Y_1n1'] # Sine Amplitude
+    planet[1, 0] = model_params['Y_1_0'] # Cosine Amplitude
+    planet[1, 1] = model_params['Y_1p1'] # Sine Amplitude
+
+    system.compute(times)
+
+    return system.lightcurve
+
+def compute_full_models_starry( model_params, times,  planet_input=None,
+                                planet=None, star=None, system=None, lmax=1,
+                                include_polynomial=True, return_case=None,
+                                verbose=False):
+    
+    if None in [planet, star, system]:
+        if planet_info is None:
+            raise ValueError("Must provide [planet, star, system] "
+                             "from `starry` or `planet_info` from "
+                             " exoMAST_API to compute model.")
+
+        planet, star, system = instantiate_system(planet_info, lmax = lmax)
+
+    starry_model = create_starry_lightcurve(planet, star, system, model_params)
+
+    if 'intercept' not in model_params.keys(): include_polynomial = False
+    
+    line_model = models.line_model_func(model_params, times) \
+        if include_polynomial else 1.0
+
+    # non-systematics model (i.e. (star + planet) / star
+    physical_model = line_model*starry_model
+    
+    if return_case == 'dict':
+        output = {}
+        # output['line_model'] = line_model
+        output['physical_model'] = physical_model
+        output['line_model'] = line_model
+        output['phase_curve_model'] = starry_model
+        
+        return output
+    else:
+        return physical_model
+
+def compute_full_model_normal(model_params, times, include_transit = True, 
                         include_eclipse = True, include_phase_curve = True, 
-                        include_polynomial = True, eclipse_option = 'trapezoid',
+                        include_polynomial = True, 
+                        eclipse_option = 'trapezoid',
                         subtract_edepth = True, return_case = None,
                         use_trap = False, verbose = False):
     
@@ -177,7 +304,11 @@ def compute_full_model(model_params, times, include_transit = True,
     
     ecl_bottom = eclipse_model == eclipse_model.min()
     # model_params['edepth'].value = phase_curve_model[ecl_bottom].mean() - 1.0
-    model_params['edepth'].value = phase_curve_model[ecl_bottom].max() - 1.0 # ??
+    
+    try:
+        model_params['edepth'].value = phase_curve_model[ecl_bottom].max() - 1.0 # ??
+    except:
+        model_params['edepth'].value = 0.0
     
     mutl_ecl = True
     try:
@@ -202,7 +333,12 @@ def compute_full_model(model_params, times, include_transit = True,
             print('\n[WARNING] BATMAN Eclipse Model Mean: {}'.format(eclipse_model.mean()))
     
     # If the phase curve does exist (all == 1), then include the eclipse alongside the transit model
-    if np.allclose(phase_curve_model, np.ones(phase_curve_model.size)): mutl_ecl = True
+    try:
+        if np.allclose(phase_curve_model, np.ones(phase_curve_model.size)): mutl_ecl = True
+    except:
+        mutl_ecl = False
+    
+    if eclipse_option == 'batman': mult_ecl = True
     
     # non-systematics model (i.e. (star + planet) / star
     physical_model = transit_model*line_model*phase_curve_model
@@ -222,27 +358,56 @@ def compute_full_model(model_params, times, include_transit = True,
     else:
         return physical_model
 
-def residuals_func(model_params, times, xcenters, ycenters, fluxes, flux_errs, knots, keep_inds, 
+def compute_full_model_normal(model_params, times, 
+                        fit_method = 'starry', include_transit = True, 
+                        include_eclipse = True, include_phase_curve = True, 
+                        include_polynomial = True, 
+                        eclipse_option = 'trapezoid',
+                        subtract_edepth = True, return_case = None,
+                        use_trap = False, verbose = False,
+                        planet_input = None, planet = None,
+                        star = None, system = None, lmax = 1,):
+    
+    if fit_method is 'starry':
+        return compute_full_models_starry( model_params, times,  
+                                    planet_input = planet_input,
+                                    planet = planet,
+                                    star = star, 
+                                    system = system, 
+                                    lmax = lmax,
+                                    include_polynomial = include_polynomial, 
+                                    return_case = return_case,
+                                    verbose = verbose)
+    
+    if fit_method is 'normal':
+        return compute_full_model_normal(model_params, times, 
+                                    include_transit = include_transit, 
+                                    include_eclipse = include_eclipse, 
+                                    include_phase_curve = include_phase_curve, 
+                                    include_polynomial = include_polynomial, 
+                                    eclipse_option = eclipse_option,
+                                    subtract_edepth = subtract_edepth, 
+                                    return_case = return_case,
+                                    use_trap = use_trap, 
+                                    verbose = verbose)
+
+def residuals_func(model_params, times, xcenters, ycenters, fluxes, flux_errs, keep_inds, knots=None, 
                     method=None, nearIndices=None, ind_kdtree=None, gw_kdtree=None, pld_intensities=None, 
                     x_bin_size  = 0.1, y_bin_size  = 0.1, transit_indices=None, include_transit = True, 
                     include_eclipse = True, include_phase_curve = True, include_polynomial = True, 
                     testing_model = False, eclipse_option = 'trapezoid', use_trap = False, verbose=False):
     
-    # start = time()
     physical_model = compute_full_model(model_params, times, include_transit = include_transit, 
                         include_eclipse = include_eclipse, include_phase_curve = include_phase_curve, 
                         include_polynomial = include_polynomial, eclipse_option = eclipse_option, verbose=verbose)
-    # print('1', time()-start)
+    
     if testing_model: return physical_model
     
     # compute the systematics model
-    # start = time()
     assert ('bliss' in method.lower() or  'krdata' in method.lower() or 'pld' in method.lower()), "No valid method selected."
-    # print('2', time()-start)
-    # start = time()
+    
     residuals = fluxes / physical_model
-    # print('3', time()-start)
-    # start = time()
+    
     sensitivity_map = models.compute_sensitivity_map(model_params=model_params, 
                                                      method=method, 
                                                      xcenters=xcenters, 
@@ -256,19 +421,89 @@ def residuals_func(model_params, times, xcenters, ycenters, fluxes, flux_errs, k
                                                      gw_kdtree=gw_kdtree, 
                                                      pld_intensities=pld_intensities, 
                                                      model=physical_model)
-    # print('4', time()-start)
-    # start = time()
+    
     if 't_start' in model_params.keys() and 'weirdslope' in model_params.keys() and 'weirdintercept' in model_params.keys():
         weirdness = np.ones(times.size)
         weirdness[times - times.mean() > model_params['t_start']] = model_params['weirdslope']*(times[times - times.mean() > model_params['t_start']]-times.mean()) \
                                                                   + model_params['weirdintercept']
     else:
         weirdness = 1.0
-    # print('5', time()-start)
-    # start = time()
+    
     model = physical_model*sensitivity_map*weirdness
-    # print('6', time()-start)
+    
     return (model - fluxes) / flux_errs 
+
+def residuals_func_multiepoch(model_params, times_list, xcenters_list, ycenters_list, fluxes_list, flux_errs_list, keep_inds_list, 
+                                knots_list=None, nearIndices_list=None, ind_kdtree_list=None, gw_kdtree_list=None, pld_intensities_list=None, 
+                                method=None, x_bin_size=0.1, y_bin_size=0.1, transit_indices=None, include_transit=True, 
+                                include_eclipse=True, include_phase_curve = True, include_polynomial=True, 
+                                testing_model=False, eclipse_option='trapezoid', use_trap=False, verbose=False):
+    
+    model_params_single = model_params.copy()
+    
+    model_full = []
+    fluxes_full = []
+    flux_errs_full = []
+    
+    zippidy_do_dah = zip(times_list, xcenters_list, ycenters_list, fluxes_list, flux_errs_list, keep_inds_list, \
+                                knots_list, nearIndices_list, ind_kdtree_list, gw_kdtree_list, pld_intensities_list)
+    
+    for epoch, zippidy_day in enumerate(zippidy_do_dah):
+        times, xcenters, ycenters, fluxes, flux_errs, keep_inds, knots, nearIndices, \
+                                            ind_kdtree, gw_kdtree, pld_intensities = zippidy_day
+        
+        model_params_single['intercept'].value = model_params_single['intercept{}'.format(epoch)]
+        model_params_single['slope'].value = model_params_single['slope{}'.format(epoch)]
+        model_params_single['curvature'].value = model_params_single['curvature{}'.format(epoch)]
+        
+        model_now = residuals_func(model_params_single, times, xcenters, ycenters, fluxes, flux_errs, keep_inds, knots=knots, 
+                    method=method, nearIndices=nearIndices, ind_kdtree=ind_kdtree, gw_kdtree=gw_kdtree, pld_intensities=pld_intensities, 
+                    x_bin_size=x_bin_size, y_bin_size=y_bin_size, transit_indices=transit_indices, include_transit=include_transit, 
+                    include_eclipse=include_eclipse, include_phase_curve=include_phase_curve, include_polynomial=include_polynomial, 
+                    testing_model=testing_model, eclipse_option=eclipse_option, use_trap=use_trap, verbose=verbose)
+        
+        model_full.extend(model_now)
+        fluxes_full.extend(fluxes)
+        flux_errs_full.extend(flux_errs)
+    
+    model_full = np.array(model_full)
+    fluxes_full = np.array(fluxes_full)
+    flux_errs_full = np.array(flux_errs_full)
+    
+    return (model_full - fluxes_full) / flux_errs_full
+
+def map_fit_params(fit_params, fit_param_names, model_params):
+    ''' A wrapper helper to convert the params from a scipy.optimize.minimize to a dictionary (i.e. LMFIT setup).
+    '''
+    assert(len(fit_params) == len(fit_param_names))
+    
+    model_params = model_params.copy()
+    
+    for p,pname in zip(fit_params, fit_param_names):
+        model_params[pname].value = p
+    
+    return model_params
+
+def chisq_func_scipy(fit_params, fit_param_names, model_params, times, xcenters, ycenters, fluxes, flux_errs, knots, keep_inds, 
+                    method=None, nearIndices=None, ind_kdtree=None, gw_kdtree=None, pld_intensities=None, 
+                    x_bin_size  = 0.1, y_bin_size  = 0.1, transit_indices=None, include_transit = True, 
+                    include_eclipse = True, include_phase_curve = True, include_polynomial = True, 
+                    testing_model = False, eclipse_option = 'trapezoid', use_trap = False, verbose=False):
+    ''' A wrapper to convert the inputs from a scipy.optimize.minimize to a dictionary setup (i.e. LMFIT setup).
+    '''
+    
+    # Convert scipy.optimize.minimize inputs to 
+    model_params_fit = map_fit_params(fit_params, fit_param_names, model_params)
+    
+    # compute CHI for CHISQ output
+    weighted_residuals = residuals_func(model_params_fit, times, xcenters, ycenters, fluxes, flux_errs, knots, keep_inds, 
+                    method=method, nearIndices=nearIndices, ind_kdtree=ind_kdtree, gw_kdtree=gw_kdtree, pld_intensities=pld_intensities, 
+                    x_bin_size=x_bin_size, y_bin_size=y_bin_size, transit_indices=transit_indices, include_transit=include_transit, 
+                    include_eclipse=include_eclipse, include_phase_curve=include_phase_curve, include_polynomial=include_polynomial, 
+                    testing_model=testing_model, eclipse_option=eclipse_option, use_trap=use_trap, verbose=verbose)
+    
+    # Return the ChiSq output
+    return np.sum(weighted_residuals**2.)
 
 def generate_best_fit_solution(model_params, times, xcenters, ycenters, fluxes, knots, keep_inds, 
                                 method=None, nearIndices=None, ind_kdtree=None, gw_kdtree=None, 
@@ -302,5 +537,27 @@ def generate_best_fit_solution(model_params, times, xcenters, ycenters, fluxes, 
     output['full_model'] = model
     output['sensitivity_map'] = sensitivity_map
     output['weirdness'] = weirdness
+    
+    return output
+
+def generate_best_fit_solution_scipy(fit_params, fit_param_names, model_params, times, xcenters, ycenters, fluxes, knots, keep_inds, 
+                                method=None, nearIndices=None, ind_kdtree=None, gw_kdtree=None, 
+                                pld_intensities=None, x_bin_size  = 0.1, y_bin_size  = 0.1, 
+                                transit_indices=None, include_transit = True, include_eclipse = True, 
+                                include_phase_curve = True, include_polynomial = True, eclipse_option = 'trapezoid',
+                                verbose = False):
+    ''' A wrapper to convert the inputs from a scipy.optimize.minimize to a dictionary setup (i.e. LMFIT setup).
+    '''
+    
+    # wrap the inputs
+    model_params_fit = map_fit_params(fit_params, fit_param_names, model_params)
+    
+    # call the dictionary based setup
+    output = generate_best_fit_solution(model_params_fit, times, xcenters, ycenters, fluxes, knots, keep_inds, 
+                                method=method, nearIndices=nearIndices, ind_kdtree=ind_kdtree, gw_kdtree=gw_kdtree, 
+                                pld_intensities=pld_intensities, x_bin_size=x_bin_size, y_bin_size=y_bin_size, 
+                                transit_indices=transit_indices, include_transit=include_transit, include_eclipse=include_eclipse, 
+                                include_phase_curve=include_phase_curve, include_polynomial=include_polynomial, eclipse_option=eclipse_option,
+                                verbose=verbose)
     
     return output

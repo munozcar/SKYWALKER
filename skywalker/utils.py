@@ -177,7 +177,7 @@ def bin_data(data, bin_size):
         init = i*bin_size
     return np.array(binned)
 
-def sub_ax_split(x, y, axs, markersize=5, alpha=0.5, lw=0, mew=0, points_per_bins=100, histtype='stepfilled', orientation='horizontal', color='gray', label=None, returnHist=False):
+def sub_ax_split(x, y, axs, markersize=5, alpha=0.5, lw=0, mew=0, points_per_bins=10, histtype='stepfilled', orientation='horizontal', color='gray', label=None, returnHist=False):
     ax_scat, ax_hist = axs
     ax_scat.plot(x, y, '.', color=color, markersize=markersize, alpha=alpha, mew=0, label=label)
     yhist, xhist, patches = ax_hist.hist(y, bins=y.size//points_per_bins, histtype=histtype, orientation=orientation, color=color, density=False);
@@ -340,7 +340,7 @@ def plot_rms_vs_binsize(model_set, fluxes, model_rms_v_bs=None, bins_arr=None, t
 def plot_fit_residuals_physics(times, fluxes, flux_errs, model_set, planet_name='', channel='', staticRad='', 
                                     varRad='', method='', plot_name='', time_stamp='', nSig=3, save_now=False, bin_size=10,
                                     label_kwargs={}, title_kwargs={}, color_cycle = None, hspace=3.0, figsize=None,
-                                    markersize=1, alpha=1, lw=0.5, mew=0, bins=100, returnAx=False, save_dir=''):
+                                    markersize=2, alpha=1, lw=0.5, mew=0, returnAx=False, save_dir='', points_per_bins=10):
     
     if 'fontsize' not in title_kwargs.keys(): title_kwargs['fontsize'] = 5
     
@@ -387,7 +387,7 @@ def plot_fit_residuals_physics(times, fluxes, flux_errs, model_set, planet_name=
     
     # Raw Flux Plots
     sub_ax_split(times_binned - times.mean(), ppm*(full_model_binned-1), [raw_scat, raw_hist], color=color_cycle[0], label='Binned Normalized Flux',
-                            markersize=markersize, alpha=alpha, lw=lw, mew=mew, bins=bins)
+                            markersize=markersize, alpha=alpha, lw=lw, mew=mew, points_per_bins=points_per_bins)
     
     raw_scat.errorbar(times_binned - times.mean(), ppm*(fluxes_binned-1), yerr=ppm*flux_errs_binned, fmt='.', mew=0,
                         color = color_cycle[1], lw=lw, markersize=markersize, label='Full Initial Model', zorder=0, alpha=0.5)
@@ -398,7 +398,7 @@ def plot_fit_residuals_physics(times, fluxes, flux_errs, model_set, planet_name=
     
     # Residual Flux Plots
     yhist, xhist, _ = sub_ax_split(times_binned - times.mean(), ppm*(fluxes_binned-full_model_binned), [res_scat, res_hist], color=color_cycle[4], returnHist=True,
-                            markersize=markersize, alpha=alpha, lw=lw, mew=mew, bins=bins)
+                            markersize=markersize, alpha=alpha, lw=lw, mew=mew, points_per_bins=points_per_bins)
     
     res_scat.set_title('Residuals from {} - {}; {}; {}; {}; {}; {}'.format('Init', planet_name, channel, staticRad, varRad, method, plot_name), **title_kwargs)
     res_scat.set_xlabel('Time [days]', **label_kwargs)
@@ -412,7 +412,7 @@ def plot_fit_residuals_physics(times, fluxes, flux_errs, model_set, planet_name=
     
     # Physics Only Plots
     sub_ax_split(times_binned - times.mean(), ppm*(fluxes_binned / sensitivity_map_binned / line_model_binned / weirdness_binned - 1.0), [phy_scat, phy_hist], color=color_cycle[0],
-                            markersize=markersize, alpha=alpha, lw=lw, mew=mew, bins=bins)
+                            markersize=markersize, alpha=alpha, lw=lw, mew=mew, points_per_bins=points_per_bins)
     
     phy_scat.plot(times_binned - times.mean(), ppm*(physical_model_binned / line_model_binned - 1.0), color=color_cycle[1], zorder=100)
     phy_scat.axhline(0.0, ls='--', color=color_cycle[2])
