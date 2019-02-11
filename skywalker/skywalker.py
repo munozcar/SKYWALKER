@@ -208,7 +208,8 @@ def instantiate_system(planet_input, fpfs=0.0,
     
     return star, planet, system
 
-def create_starry_lightcurve(planet, star, system, model_params, lambda0=90.0):
+def create_starry_lightcurve(planet, star, system, model_params, times,
+                                lambda0=90.0):
     ''' 
     '''
     star[1] = model_params['u1'].value
@@ -220,7 +221,7 @@ def create_starry_lightcurve(planet, star, system, model_params, lambda0=90.0):
     planet.lambda0 = lambda0 # Mean longitude in degrees at reference time
     planet.r = rprs # planetary radius in stellar radius
     planet.L = model_params['edepth'].value # flux from planet relative to star
-    planet.inc = model_params['inclination'].value # orbital inclination 
+    planet.inc = model_params['inc'].value # orbital inclination 
     planet.a = model_params['aprs'].value # orbital distance in stellar radius
     planet.prot = model_params['period'].value # synchronous rotation
     planet.porb = model_params['period'].value # synchronous rotation
@@ -244,15 +245,16 @@ def compute_full_models_starry( model_params, times,  planet_info=None,
                                 include_polynomial=True, return_case=None,
                                 verbose=False):
     
-    if None in [planet, star, system]:
+    if None in [star, planet, system]:
         if planet_info is None:
             raise ValueError("Must provide [planet, star, system] "
                              "from `starry` or `planet_info` from "
                              " exoMAST_API to compute model.")
 
-        planet, star, system = instantiate_system(planet_info, lmax = lmax)
+        star, planet, system = instantiate_system(planet_info, lmax = lmax)
 
-    starry_model = create_starry_lightcurve(planet, star, system, model_params)
+    starry_model = create_starry_lightcurve(planet, star, system, 
+                                            model_params, times)
 
     if 'intercept' not in model_params.keys(): include_polynomial = False
     
@@ -396,13 +398,14 @@ def compute_full_model(model_params, times, planet_info=None,
                                     verbose = verbose)
 
 def residuals_func(model_params, times, xcenters, ycenters, fluxes, flux_errs, 
-                    keep_inds, knots=None, method=None, nearIndices=None, 
-                    ind_kdtree=None, gw_kdtree=None, pld_intensities=None, 
-                    x_bin_size  = 0.1, y_bin_size  = 0.1, transit_indices=None,
-                    include_transit = True, include_eclipse = True, 
-                    include_phase_curve = True, include_polynomial = True, 
-                    testing_model = False, eclipse_option = 'trapezoid', 
-                    use_trap = False, verbose=False):
+                keep_inds, planet=None, star=None, system=None, 
+                planet_info=None, knots=None, method=None, nearIndices=None, 
+                ind_kdtree=None, gw_kdtree=None, pld_intensities=None, 
+                x_bin_size  = 0.1, y_bin_size  = 0.1, transit_indices=None,
+                include_transit = True, include_eclipse = True, 
+                include_phase_curve = True, include_polynomial = True, 
+                testing_model = False, eclipse_option = 'trapezoid', 
+                use_trap = False, verbose=False):
     
     physical_model = compute_full_model(model_params, times, 
                         planet_info = planet_info,
