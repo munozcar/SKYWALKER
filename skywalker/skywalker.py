@@ -358,7 +358,7 @@ def compute_full_model_normal(model_params, times, include_transit = True,
     else:
         return physical_model
 
-def compute_full_model_normal(model_params, times, 
+def compute_full_model(model_params, times, 
                         fit_method = 'starry', include_transit = True, 
                         include_eclipse = True, include_phase_curve = True, 
                         include_polynomial = True, 
@@ -378,7 +378,7 @@ def compute_full_model_normal(model_params, times,
                                     include_polynomial = include_polynomial, 
                                     return_case = return_case,
                                     verbose = verbose)
-    
+
     if fit_method is 'normal':
         return compute_full_model_normal(model_params, times, 
                                     include_transit = include_transit, 
