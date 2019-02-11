@@ -30,6 +30,7 @@ from sklearn.externals import joblib
 from functools import partial
 from lmfit import Parameters, Minimizer, report_errors
 from scipy import spatial
+from scipy.interpolate import CubicSpline
 from statsmodels.robust import scale
 from time import time
 
@@ -240,11 +241,85 @@ def create_starry_lightcurve(planet, star, system, model_params, times,
 
     return system.lightcurve
 
-def compute_full_models_starry( model_params, times,  planet_info=None,
+def deltaphase_eclipse(ecc, omega):
+    ''' Compute the delta phase offset for the eclipse relative to transit '''
+    return 0.5*( 1 + (4. / pi) * ecc * cos(omega))
+
+def find_eclipse_transits(times, model_params):
+    ''' Find the index location of the eclipse and transit '''
+    trantime = model_params['init_t0'] + model_params['deltaTc']
+    eclphase =  deltaphase_eclipse(model_params['ecc'], model_params['omega'])
+    phase = ((times - tt) % model_params['period']) / model_params['period']
+
+    if (eclphase >= phase.min()) and (eclphase <= phase.max()):
+        eclipse_loc = abs(phase-eclphase).argmin()
+    else:
+        eclipse_loc = None
+    
+    if (0.0 >= phase.min()) and (0.0 <= phase.max()):
+        transit_loc = abs(phase).argmin()
+    else:
+        transit_loc = None
+
+    return eclipse_loc, transit_loc
+
+def generate_local_times(times, model_params, eclipse_width=0.1):
+    ''' This generates smaller times array for interpolation with starry '''
+    n_events = 3
+    eclipse_loc, transit_loc = find_eclipse_transits(times, model_params)
+    
+    trantime = model_params['init_t0'] + model_params['deltaTc']
+    per = model_params['period']
+
+    phase = ((times - tt) % per) / per
+
+    if eclipse_loc is None: n_events -= 1
+
+    if transit_loc is None: n_events -= 1
+
+    assert(n_events > 0), "Error: Somehow the number of events is "\
+                          "less than 0"
+
+    n_pts_per_event = times.size * interp_raio/n_events
+    times_local = np.linspace(times.min(), times.max(), n_pts_per_event)
+    times_local = list(times_local)
+
+    if eclipse_loc is not None:
+        eclipse_time = times[eclipse_loc]
+        ecl_time_width = eclipse_width*per
+        idx_eclipse_low = (times - (eclipse_time-0.5*ecl_time_width)).argmin()
+        idx_eclipse_high = (times - (eclipse_time+0.5*ecl_time_width)).argmin()
+        
+        eclipse_times = np.linspace(times[idx_eclipse_low], \
+                                    times[idx_eclipse_high])
+
+        times_local.extend(eclipse_times)
+
+    if transit_loc is not None:
+        transit_time = times[transit_loc]
+        tr_time_width = transit_width*per
+        idx_transit_low = (times - (transit_time-0.5*tr_time_width)).argmin()
+        idx_transit_high = (times - (transit_time+0.5*tr_time_width)).argmin()
+
+        transit_times = np.linspace(times[idx_transit_low], \
+                                    times[idx_transit_high])
+
+        times_local.extend(transit_times)
+
+    return times_local[np.argsort(times_local)]
+
+
+def compute_full_model_starry( model_params, times,  planet_info=None,
                                 planet=None, star=None, system=None, lmax=2,
                                 include_polynomial=True, return_case=None,
-                                verbose=False):
+                                interpolate=False, interp_ratio=0.1,
+                                eclipse_width = 0.1, verbose=False):
     
+    if interpolate:
+        times_local = generate_local_time(times, eclipse_width)
+    else:
+        times_local = times
+
     if None in [star, planet, system]:
         if planet_info is None:
             raise ValueError("Must provide [planet, star, system] "
@@ -254,16 +329,20 @@ def compute_full_models_starry( model_params, times,  planet_info=None,
         star, planet, system = instantiate_system(planet_info, lmax = lmax)
 
     starry_model = create_starry_lightcurve(planet, star, system, 
-                                            model_params, times)
+                                            model_params, times_local)
 
     if 'intercept' not in model_params.keys(): include_polynomial = False
     
-    line_model = models.line_model_func(model_params, times) \
+    line_model = models.line_model_func(model_params, times_local) \
         if include_polynomial else 1.0
 
     # non-systematics model (i.e. (star + planet) / star
     physical_model = line_model*starry_model
     
+    if interpolate:
+        physical_model_int = CubicSpline(times_local, physical_model)
+        physical_model = physical_model_int(times)
+
     if return_case == 'dict':
         output = {}
         # output['line_model'] = line_model
@@ -364,17 +443,16 @@ def compute_full_model_normal(model_params, times, include_transit = True,
         return physical_model
 
 def compute_full_model(model_params, times, planet_info=None,
-                        fit_method = 'starry', include_transit = True, 
-                        include_eclipse = True, include_phase_curve = True, 
-                        include_polynomial = True, 
-                        eclipse_option = 'trapezoid',
-                        subtract_edepth = True, return_case = None,
-                        use_trap = False, verbose = False,
-                        planet_input = None, planet = None,
-                        star = None, system = None, lmax = 2,):
-    
+                    fit_method='starry', include_transit=True, 
+                    include_eclipse=True, include_phase_curve=True, 
+                    include_polynomial=True, eclipse_option='trapezoid', 
+                    interpolate=False, subtract_edepth=True, 
+                    return_case=None, use_trap=False, verbose=False,
+                    planet_input=None, planet=None,
+                    star=None, system=None, lmax=2):
+
     if fit_method is 'starry':
-        return compute_full_models_starry( model_params, times,  
+        return compute_full_model_starry( model_params, times,  
                                     planet_info = planet_info,
                                     planet = planet,
                                     star = star, 
@@ -382,9 +460,12 @@ def compute_full_model(model_params, times, planet_info=None,
                                     lmax = lmax,
                                     include_polynomial = include_polynomial, 
                                     return_case = return_case,
+                                    interpolate=interpolate,
                                     verbose = verbose)
 
+    '''
     if fit_method is 'normal':
+        
         return compute_full_model_normal(model_params, times, 
                                     planet_info = planet_info,
                                     include_transit = include_transit, 
@@ -396,6 +477,7 @@ def compute_full_model(model_params, times, planet_info=None,
                                     return_case = return_case,
                                     use_trap = use_trap, 
                                     verbose = verbose)
+        '''
 
 def residuals_func(model_params, times, xcenters, ycenters, fluxes, flux_errs, 
                 keep_inds, planet=None, star=None, system=None, 
@@ -405,7 +487,7 @@ def residuals_func(model_params, times, xcenters, ycenters, fluxes, flux_errs,
                 include_transit = True, include_eclipse = True, 
                 include_phase_curve = True, include_polynomial = True, 
                 testing_model = False, eclipse_option = 'trapezoid', 
-                use_trap = False, verbose=False):
+                use_trap = False, interpolate=False, verbose=False):
     
     physical_model = compute_full_model(model_params, times, 
                         planet_info = planet_info,
@@ -414,6 +496,7 @@ def residuals_func(model_params, times, xcenters, ycenters, fluxes, flux_errs,
                         include_phase_curve = include_phase_curve, 
                         include_polynomial = include_polynomial, 
                         eclipse_option = eclipse_option, 
+                        interpolate=interpolate,
                         verbose=verbose)
     
     if testing_model: return physical_model
@@ -525,7 +608,8 @@ def generate_best_fit_solution(model_params, times, xcenters, ycenters, fluxes,
                                 method=None, nearIndices=None, ind_kdtree=None,
                                 gw_kdtree=None, pld_intensities=None, 
                                 x_bin_size  = 0.1, y_bin_size  = 0.1, 
-                                transit_indices=None, include_transit = True, 
+                                transit_indices=None, interpolate=False,
+                                include_transit = True, 
                                 include_eclipse = True, 
                                 include_phase_curve = True, 
                                 include_polynomial = True, 
@@ -539,6 +623,7 @@ def generate_best_fit_solution(model_params, times, xcenters, ycenters, fluxes,
                                 include_phase_curve = include_phase_curve, 
                                 include_polynomial = include_polynomial, 
                                 eclipse_option = eclipse_option, 
+                                interpolate=interpolate,
                                 return_case='dict', verbose=verbose)
     
     # compute the systematics model
