@@ -189,6 +189,12 @@ def instantiate_system(planet_input, fpfs=0.0,
     # Instantiate the planet
     planet = kepler.Secondary(lmax=lmax)
     planet.lambda0 = lambda0 # Mean longitude in degrees at reference time
+    
+    if not hasattr(planet_info, 'Rp_Rs'):
+        print('[WARNING] Rp_Rs does not exist in `planet_info`')
+        print('Assuming Rp_Rs == sqrt(transit_depth)')
+        planet_info.Rp_Rs = np.sqrt(planet_info.transit_depth)
+    
     planet.r = planet_info.Rp_Rs # planetary radius in stellar radius
     planet.L = fpfs # flux from planet relative to star
     planet.inc = planet_info.inclination # orbital inclination 
