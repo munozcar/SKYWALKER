@@ -125,11 +125,14 @@ package_info['package_data'][PACKAGENAME].extend(c_files)
 # ``setup``, since these are now deprecated. See this link for more details:
 # https://groups.google.com/forum/#!topic/astropy-dev/urYO8ckB2uM
 
+install_reqs = [s.strip() for s in metadata.get('install_requires', 'astropy').split(',')]
+install_reqs.append('astropy_helpers')
+
 setup(name=PACKAGENAME,
       version=VERSION,
       description=DESCRIPTION,
       scripts=scripts,
-      install_requires=[s.strip() for s in metadata.get('install_requires', 'astropy').split(',')],
+      install_requires=install_reqs,
       author=AUTHOR,
       author_email=AUTHOR_EMAIL,
       license=LICENSE,
