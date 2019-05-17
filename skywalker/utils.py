@@ -387,7 +387,7 @@ def plot_rms_vs_binsize(model_set, fluxes, model_rms_v_bs=None, bins_arr=None,
     # transit_duration = np.where(tmodel < tmodel.max())[0]
     # transit_duration = transit_duration.max() - transit_duration.min()
     
-    if None not in [transit_duration, times]:
+    if transit_duration is not None and times is not None:
         i_trans_dur = np.int32(transit_duration // np.median(np.diff(times)))
     elif transit_duration is not None:
         i_trans_dur = transit_duration
