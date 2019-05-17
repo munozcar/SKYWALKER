@@ -31,7 +31,7 @@ def extractData(file, flux_key='phots', time_key='times', flux_err_key='noise',
     xwidths = group[xwidth_key].flatten()
     ywidths = group[ywidth_key].flatten()
     
-    return fluxes, times, flux_errs, npix, pld_intensities, 
+    return fluxes, times, flux_errs, npix, pld_intensities, \
             xcenters, ycenters, xwidths, ywidths
 
 def nearest(xc, yc, neighbors, tree):
