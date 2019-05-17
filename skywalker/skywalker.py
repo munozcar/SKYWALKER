@@ -189,11 +189,12 @@ def instantiate_system(planet_input, fpfs=0.0,
     # Instantiate the planet
     planet = kepler.Secondary(lmax=lmax)
     planet.lambda0 = lambda0 # Mean longitude in degrees at reference time
-    
+
     if not hasattr(planet_info, 'Rp_Rs'):
-        print('[WARNING] Rp_Rs does not exist in `planet_info`')
-        print('Assuming Rp_Rs == sqrt(transit_depth)')
-        planet_info.Rp_Rs = np.sqrt(planet_info.transit_depth)
+        if planet_info.Rp_Rs is None:
+            print('[WARNING] Rp_Rs does not exist in `planet_info`')
+            print('Assuming Rp_Rs == sqrt(transit_depth)')
+            planet_info.Rp_Rs = np.sqrt(planet_info.transit_depth)
     
     planet.r = planet_info.Rp_Rs # planetary radius in stellar radius
     planet.L = fpfs # flux from planet relative to star
@@ -215,6 +216,36 @@ def instantiate_system(planet_input, fpfs=0.0,
     
     return star, planet, system
 
+def update_starry_system(planet, star, system, model_params, times,
+                                lambda0=90.0):
+
+    star[1] = model_params['u1'].value
+    star[2] = model_params['u2'].value
+
+    rprs =  np.sqrt(model_params['tdepth'].value)
+
+    # Update the planetary parameters
+    planet.lambda0 = lambda0 # Mean longitude in degrees at reference time
+    planet.r = rprs # planetary radius in stellar radius
+    planet.L = model_params['edepth'].value # flux from planet relative to star
+    planet.inc = model_params['inc'].value # orbital inclination 
+    planet.a = model_params['aprs'].value # orbital distance in stellar radius
+    planet.prot = model_params['period'].value # synchronous rotation
+    planet.porb = model_params['period'].value # synchronous rotation
+
+    # MJD for transit center time
+    planet.tref = model_params['init_t0'].value + model_params['deltaTc'].value
+
+    planet.ecc = model_params['ecc'].value # eccentricity of orbit
+    planet.Omega = model_params['omega'].value # argument of the ascending node
+
+    planet[1,-1] = model_params['Y_1n1'].value # Sine Amplitude
+    planet[1, 0] = model_params['Y_1_0'].value # Cosine Amplitude
+    planet[1, 1] = model_params['Y_1p1'].value # Sine Amplitude
+
+    system.compute(times)
+
+    return system.lightcurve
 def create_starry_lightcurve(planet, star, system, model_params, times,
                                 lambda0=90.0):
     ''' 
