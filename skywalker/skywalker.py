@@ -16,7 +16,7 @@ import numpy as np
 import batman
 import corner
 import argparse
-import exoparams
+# import exoparams
 import json
 import matplotlib
 import matplotlib.pyplot as plt
