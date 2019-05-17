@@ -126,6 +126,7 @@ def setup_inputs_from_file(dataDir, x_bin_size=0.1, y_bin_size=0.1,
                                 xcenter_key = xcenter_key, 
                                 ywidth_key = ywidth_key, 
                                 xwidth_key = xwidth_key)
+
     fluxes, times, flux_errs, npix, pld_intensities, \
         xcenters, ycenters, xwidths, ywidths = extracted_data
 
@@ -193,14 +194,14 @@ def exoparams_to_lmfit_params(planet_name):
         raise ImportError('requires downloading `exoparams` as '
                     '\npip install git+https://github.com/bmorris3/exoparams')
 
-    ep_params   = exoparams.PlanetParams(planet_name)
-    iApRs       = ep_params.ar.value
-    iEcc        = ep_params.ecc.value
-    iInc        = ep_params.i.value
-    iPeriod     = ep_params.per.value
-    iTCenter    = ep_params.tt.value
-    iTdepth     = ep_params.depth.value
-    iOmega      = ep_params.om.value
+    ep_params = exoparams.PlanetParams(planet_name)
+    iApRs = ep_params.ar.value
+    iEcc = ep_params.ecc.value
+    iInc = ep_params.i.value
+    iPeriod = ep_params.per.value
+    iTCenter = ep_params.tt.value
+    iTdepth = ep_params.depth.value
+    iOmega = ep_params.om.value
 
     return iPeriod, iTCenter, iApRs, iInc, iTdepth, iEcc, iOmega
 
@@ -250,27 +251,27 @@ def bin_array(arr, uncs = None,  binsize=100, KeepTheChange = False):
     '''
     from numpy import mean, std, sqrt
     
-    nSize   = arr.size
-    nCols   = int(nSize / binsize)
-    nRows   = binsize
+    nSize = arr.size
+    nCols = int(nSize / binsize)
+    nRows = binsize
 
-    EqSize  = nRows*nCols
+    EqSize = nRows*nCols
     
-    useArr  = arr[:EqSize].copy()   # this array can be subdivided evenly
+    useArr = arr[:EqSize].copy()   # this array can be subdivided evenly
     
     if uncs is not None:
         # weighted mean profile
         useUncs = uncs[:EqSize].copy()   # this array can be subdivided evenly
 
         binArr = (useArr / useUncs).reshape(nCols, nRows).mean(axis=1)
-        binArr  = median(binArr / useUncs.reshape(nCols, nRows))
+        binArr = median(binArr / useUncs.reshape(nCols, nRows))
 
         stdArr = (useArr / useUncs).reshape(nCols, nRows).std(axis=1)
-        stdArr  = median( stdArr / useUncs.reshape(nCols, nRows))
+        stdArr = median( stdArr / useUncs.reshape(nCols, nRows))
         
         if KeepTheChange:
-            SpareArr    = arr[EqSize:].copy()
-            SpareUncs   = uncs[EqSize:].copy()
+            SpareArr = arr[EqSize:].copy()
+            SpareUncs = uncs[EqSize:].copy()
 
             binTC = median((SpareArr / SpareUncs))
             binTC = binTC / median(SpareUncs.reshape(nCols, nRows))
@@ -278,20 +279,20 @@ def bin_array(arr, uncs = None,  binsize=100, KeepTheChange = False):
             stdTC = median((SpareArr / SpareUncs))
             stdTC = stdTC / median(SpareUncs.reshape(nCols, nRows))
 
-            binArr  = concatenate((binArr, [binTC]))
-            stdArr  = concatenate((stdArr, [stdTC]))
+            binArr = concatenate((binArr, [binTC]))
+            stdArr = concatenate((stdArr, [stdTC]))
     else:
         # standard mean profile
-        binArr  = mean(useArr.reshape(nCols, nRows),axis=1)
-        stdArr  = std(useArr.reshape(nCols, nRows),axis=1) / sqrt(nSize)
+        binArr = mean(useArr.reshape(nCols, nRows),axis=1)
+        stdArr = std(useArr.reshape(nCols, nRows),axis=1) / sqrt(nSize)
         
         if KeepTheChange:
-            SpareArr    = arr[EqSize:].copy()
-            binTC       = median(SpareArr)
-            stdTC       = std(SpareArr)
+            SpareArr = arr[EqSize:].copy()
+            binTC = median(SpareArr)
+            stdTC = std(SpareArr)
 
-            binArr  = concatenate((binArr, [binTC]))
-            stdArr  = concatenate((stdArr, [stdTC]))
+            binArr = concatenate((binArr, [binTC]))
+            stdArr = concatenate((stdArr, [stdTC]))
 
     return binArr, stdArr
 
