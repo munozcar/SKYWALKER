@@ -388,7 +388,7 @@ def plot_rms_vs_binsize(model_set, fluxes, model_rms_v_bs=None, bins_arr=None,
     # transit_duration = transit_duration.max() - transit_duration.min()
     
     if transit_duration is not None:
-        i_trans_dur = transit_duration // np.median(np.diff(times))
+        i_trans_dur = np.int32(transit_duration // np.median(np.diff(times)))
 
     if model_rms_v_bs is None or bins_arr is None: 
         full_model = model_set['full_model']
@@ -399,10 +399,6 @@ def plot_rms_vs_binsize(model_set, fluxes, model_rms_v_bs=None, bins_arr=None,
     theory_gauss /= theory_gauss[0]
     
     if label is not None and transit_duration is not None:
-        print('model_rms_v_bs', model_rms_v_bs)
-        print('theory_gauss', theory_gauss)
-        print('i_trans_dur', i_trans_dur)
-        
         ratio = (model_rms_v_bs / theory_gauss)[i_trans_dur]
         label = label + ' {:.2f}x'.format(ratio)
     
