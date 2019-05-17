@@ -175,8 +175,8 @@ def setup_inputs_from_file(dataDir, x_bin_size=0.1, y_bin_size=0.1,
         knots = None
         nearIndices = None
     
-    return fluxes, times, flux_errs, npix, pld_intensities, xcenters, 
-            ycenters, xwidths, ywidths, knots, nearIndices, keep_inds, 
+    return fluxes, times, flux_errs, npix, pld_intensities, xcenters, \
+            ycenters, xwidths, ywidths, knots, nearIndices, keep_inds, \
             ind_kdtree, gw_kdtree
 
 def exoparams_to_lmfit_params(planet_name):
