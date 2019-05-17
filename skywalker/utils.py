@@ -387,8 +387,10 @@ def plot_rms_vs_binsize(model_set, fluxes, model_rms_v_bs=None, bins_arr=None,
     # transit_duration = np.where(tmodel < tmodel.max())[0]
     # transit_duration = transit_duration.max() - transit_duration.min()
     
-    if transit_duration is not None:
+    if None not in [transit_duration, times]:
         i_trans_dur = np.int32(transit_duration // np.median(np.diff(times)))
+    elif transit_duration is not None:
+        i_trans_dur = transit_duration
 
     if model_rms_v_bs is None or bins_arr is None: 
         full_model = model_set['full_model']
@@ -401,17 +403,18 @@ def plot_rms_vs_binsize(model_set, fluxes, model_rms_v_bs=None, bins_arr=None,
     if label is not None and transit_duration is not None:
         ratio = (model_rms_v_bs / theory_gauss)[i_trans_dur]
         label = label + ' {:.2f}x'.format(ratio)
-    
+    '''
     if times is not None: 
-        print('This doent work!')
+        print('This doesnt work!')
         bins_arr = times[np.int32(bins_arr)]
-        # transit_duration = times[i_trans_dur]
-    
+        # transit_duration = times[i_trans_dur]        
+    '''
     ax.loglog(bins_arr, model_rms_v_bs, lw=1, color=color, label=label, 
                 zorder=zorder, alpha=alpha);
     ax.loglog(bins_arr, theory_gauss, color='black', ls='--', lw=1, 
                 label='Gaussian Residuals');
-    ax.axvline(transit_duration, color='darkgrey', ls='--', lw=1)
+    ax.axvline(transit_duration, color='darkgrey', ls='--', lw=1, 
+                label='Transit Duration')
     ax.set_ylim(theory_gauss.min()/1.1,1.1*theory_gauss.max())
     
     ax.legend(loc=0)
