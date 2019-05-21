@@ -156,7 +156,7 @@ def instantiate_system(planet_input, fpfs=0.0,
 						phase_curve_amp_1_0 = 0.0,
 						phase_curve_amp_1n1 = 0.0,
 						phase_curve_amp_1p1 = 0.0,
-						lmax=1, lambda0=90.0):
+						lmax=3, lambda0=90.0):
 	"""
 		instantiate the planet :class:``Primary``,
 		:class:``Secondary``, and :class:``System``
@@ -250,7 +250,7 @@ def update_starry_system(planet, star, system, model_params, times,
 	return system.lightcurve
 def create_starry_lightcurve(planet, star, system, model_params, times,
 								lambda0=90.0):
-	''' 
+	''' Use the STARRY infrastucture to create a planetary phase curve model
 	'''
 	star[1] = model_params['u1'].value
 	star[2] = model_params['u2'].value
@@ -271,14 +271,22 @@ def create_starry_lightcurve(planet, star, system, model_params, times,
 
 	planet.ecc = model_params['ecc'].value # eccentricity of orbit
 	planet.Omega = model_params['omega'].value # argument of the ascending node
+	
+	a_starry = model_params['a_starry']
+	b_starry = model_params['b_starry']
 
-	planet[1,-1] = model_params['Y_1n1'].value # Sine Amplitude
-	planet[1, 0] = model_params['Y_1_0'].value # Cosine Amplitude
-	planet[1, 1] = model_params['Y_1p1'].value # Sine Amplitude
+	# Double sigmoid model derived by Rodrigo Lugar for STARRY implementation
+	#	Requires lmax == 3
+	planet_map[0, 0] = 1.0
+    planet_map[1, 0] = a_starry
+    planet_map[2, 0] = -a_starry * b_starry / np.sqrt(15)
+
+	# planet[1,-1] = model_params['Y_1n1'].value # Sine Amplitude
+	# planet[1, 0] = model_params['Y_1_0'].value # Cosine Amplitude
+	# planet[1, 1] = model_params['Y_1p1'].value # Sine Amplitude
 
 	system.compute(times)
-
-	return system.lightcurve
+	return model_params['day2night']*system.lightcurve
 
 def deltaphase_eclipse(ecc, omega):
 	''' Compute the delta phase offset for the eclipse relative to transit '''
@@ -353,7 +361,7 @@ def generate_local_times(times, model_params,
 	return times_local[times_local.argsort()]
 
 def compute_full_model_starry( model_params, times,  planet_info=None,
-								planet=None, star=None, system=None, lmax=2,
+								planet=None, star=None, system=None, lmax=3,
 								include_polynomial=True, return_case=None,
 								interpolate=False, interp_ratio=0.1,
 								eclipse_width = 0.1, verbose=False):
@@ -517,7 +525,7 @@ def compute_full_model(model_params, times, planet_info=None,
 					interpolate=False, interp_ratio=0.1, subtract_edepth=True, 
 					return_case=None, use_trap=False, verbose=False,
 					planet_input=None, planet=None,
-					star=None, system=None, lmax=2):
+					star=None, system=None, lmax=3):
 
 	if fit_function is 'starry':
 		return compute_full_model_starry( model_params, times,  
