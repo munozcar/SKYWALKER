@@ -1,6 +1,7 @@
 from scipy import spatial
-from pylab import *;
+from pylab import *
 from . import utils
+
 
 def nearestIndices(xcenters, ycenters, knotTree):
     """
@@ -11,7 +12,7 @@ def nearestIndices(xcenters, ycenters, knotTree):
         Returns:
         array: array of arrays, each with the indices of the 4 nearest knots to each element in x/y-centers.
         """
-    return array([utils.nearest(xc,yc, 4, knotTree) for xc,yc in zip(xcenters, ycenters)])
+    return array([utils.nearest(xc, yc, 4, knotTree) for xc, yc in zip(xcenters, ycenters)])
 
 
 def createGrid(xcenters, ycenters, xBinSize, yBinSize):
@@ -24,6 +25,7 @@ def createGrid(xcenters, ycenters, xBinSize, yBinSize):
     xmin, xmax = min(xcenters), max(xcenters)
     ymin, ymax = min(ycenters), max(ycenters)
     return [(x, y) for x in arange(xmin, xmax, xBinSize) for y in arange(ymin, ymax, yBinSize)]
+
 
 def associateFluxes(knots, nearIndices, xcenters, ycenters, fluxes):
     """
@@ -42,6 +44,7 @@ def associateFluxes(knots, nearIndices, xcenters, ycenters, fluxes):
         knot_fluxes[N].append(fluxes[kp])
     return [mean(flux) if len(flux) is not 0 else 0 for flux in knot_fluxes]
 
+
 def generate_deltaX_deltaY(xcenters, ycenters, knots, nearIndices):
     """
         :param xcenters: array of lists with x coordinates of each center.
@@ -51,11 +54,12 @@ def generate_deltaX_deltaY(xcenters, ycenters, knots, nearIndices):
     """
     deltaX1 = zeros(len(xcenters))
     deltaY1 = zeros(len(ycenters))
-    for kp, (xc,yc) in enumerate(zip(xcenters, ycenters)):
+    for kp, (xc, yc) in enumerate(zip(xcenters, ycenters)):
         deltaX1[kp] = abs(xc - knots[nearIndices[kp][0]][0])
         deltaY1[kp] = abs(yc - knots[nearIndices[kp][0]][1])
 
     return deltaX1, deltaY1
+
 
 def interpolateFlux(knots, knotFluxes, deltaX1, deltaY1, nearIndices, xBinSize, yBinSize, normFactor):
     """
@@ -72,7 +76,7 @@ def interpolateFlux(knots, knotFluxes, deltaX1, deltaY1, nearIndices, xBinSize, 
         array: array of interpolated flux at each point in x/y-centers.
     """
     interpolated_fluxes = np.zeros(len(deltaX1))
-    for kp, (dx1,dy1) in enumerate(zip(deltaX1, deltaY1)):
+    for kp, (dx1, dy1) in enumerate(zip(deltaX1, deltaY1)):
         nearest_fluxes = [knotFluxes[i] for i in nearIndices[kp]]
         # If any knot has no flux, use nearest neighbor interpolation.
         if 0 in nearest_fluxes:
@@ -86,10 +90,13 @@ def interpolateFlux(knots, knotFluxes, deltaX1, deltaY1, nearIndices, xBinSize, 
             dy2 = xBinSize - dy1
 
             interpolated_fluxes[kp] = normFactor * (dx1 * dy2 * nearest_fluxes[0]
-                                                  + dx2 * dy2 * nearest_fluxes[1]
-                                                  + dx2 * dy1 * nearest_fluxes[2]
-                                                  + dx1 * dy1 * nearest_fluxes[3])
+                                                    + dx2 * dy2 *
+                                                    nearest_fluxes[1]
+                                                    + dx2 * dy1 *
+                                                    nearest_fluxes[2]
+                                                    + dx1 * dy1 * nearest_fluxes[3])
     return interpolated_fluxes
+
 
 def BLISS(xcenters, ycenters, fluxes, knots, nearIndices, xBinSize=0.01, yBinSize=0.01, normFactor=10000):
     """
@@ -105,7 +112,9 @@ def BLISS(xcenters, ycenters, fluxes, knots, nearIndices, xBinSize=0.01, yBinSiz
         Returns:
         array: array of interpolated flux at each point in x/y-centers.
         """
-    meanKnotFluxes = associateFluxes(knots, nearIndices, xcenters, ycenters, fluxes)
-    deltaX1, deltaY1 = generate_deltaX_deltaY(xcenters, ycenters, knots, nearIndices)
+    meanKnotFluxes = associateFluxes(
+        knots, nearIndices, xcenters, ycenters, fluxes)
+    deltaX1, deltaY1 = generate_deltaX_deltaY(
+        xcenters, ycenters, knots, nearIndices)
 
     return interpolateFlux(knots=knots, knotFluxes=meanKnotFluxes, deltaX1=deltaX1, deltaY1=deltaY1, nearIndices=nearIndices, xBinSize=xBinSize, yBinSize=yBinSize, normFactor=normFactor)

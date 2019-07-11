@@ -13,8 +13,11 @@ conf.read(['setup.cfg'])
 metadata = dict(conf.items('metadata'))
 
 PACKAGENAME = metadata.get('package_name', 'skywalker')
-DESCRIPTION = metadata.get('description', 'Spitzer Key Yield With All that Lightcurve Exoplanet Research')
-AUTHOR = metadata.get('author', 'Carlos Munoz, Jonathan Fraine, Kevin Stevenson')
+DESCRIPTION = metadata.get(
+    'description',
+    'Spitzer Key Yield With All that Lightcurve Exoplanet Research')
+AUTHOR = metadata.get(
+    'author', 'Carlos Munoz, Jonathan Fraine, Kevin Stevenson')
 AUTHOR_EMAIL = metadata.get('author_email', '')
 LICENSE = metadata.get('license', 'BSD3')
 URL = metadata.get('url', 'https://github.com/munozcar/SKYWALKER')
@@ -22,8 +25,11 @@ __minimum_python_version__ = metadata.get("minimum_python_version", "3.5")
 
 # Enforce Python version check - this is the same check as in __init__.py but
 # this one has to happen before importing ah_bootstrap.
-if sys.version_info < tuple((int(val) for val in __minimum_python_version__.split('.'))):
-    sys.stderr.write("ERROR: skywalker requires Python {} or later\n".format(__minimum_python_version__))
+min_py_ver_split = __minimum_python_version__.split('.')
+if sys.version_info < tuple((int(val) for val in min_py_ver_split)):
+    sys.stderr.write(
+        "ERROR: skywalker requires Python {} or later\n".format(
+            __minimum_python_version__))
     sys.exit(1)
 
 # Import ah_bootstrap after the python version validation
@@ -34,7 +40,8 @@ from setuptools import setup
 import builtins
 builtins._ASTROPY_SETUP_ = True
 
-from astropy_helpers.setup_helpers import (register_commands, get_debug_option,
+from astropy_helpers.setup_helpers import (register_commands,
+                                           get_debug_option,
                                            get_package_info)
 from astropy_helpers.git_helpers import get_git_devstr
 from astropy_helpers.version_helpers import generate_version_py
@@ -69,7 +76,7 @@ else:
 builtins._ASTROPY_PACKAGE_NAME_ = PACKAGENAME
 
 # VERSION should be PEP440 compatible (http://www.python.org/dev/peps/pep-0440)
-VERSION = metadata.get('version', '0.0.dev')
+VERSION = metadata.get('version', '0.2.dev')
 
 # Indicates if this version is a release version
 RELEASE = 'dev' not in VERSION
@@ -125,7 +132,8 @@ package_info['package_data'][PACKAGENAME].extend(c_files)
 # ``setup``, since these are now deprecated. See this link for more details:
 # https://groups.google.com/forum/#!topic/astropy-dev/urYO8ckB2uM
 
-install_reqs = [s.strip() for s in metadata.get('install_requires', 'astropy').split(',')]
+install_reqs = [s.strip() for s in metadata.get(
+    'install_requires', 'astropy').split(',')]
 install_reqs.append('astropy_helpers')
 
 setup(name=PACKAGENAME,
@@ -145,4 +153,4 @@ setup(name=PACKAGENAME,
       entry_points=entry_points,
       python_requires='>={}'.format(__minimum_python_version__),
       **package_info
-)
+      )
