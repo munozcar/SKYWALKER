@@ -383,7 +383,6 @@ def bin_array(arr, uncs=None,  binsize=100, KeepTheChange=False):
             The mean of the remaining elements from the input array is then
                 taken as the final element in the output array
     '''
-    from numpy import mean, std, sqrt
 
     nSize = arr.size
     nCols = int(nSize / binsize)
@@ -417,8 +416,8 @@ def bin_array(arr, uncs=None,  binsize=100, KeepTheChange=False):
             stdArr = np.concatenate((stdArr, [stdTC]))
     else:
         # standard mean profile
-        binArr = mean(useArr.reshape(nCols, nRows), axis=1)
-        stdArr = np.std(useArr.reshape(nCols, nRows), axis=1) / sqrt(nSize)
+        binArr = np.mean(useArr.reshape(nCols, nRows), axis=1)
+        stdArr = np.std(useArr.reshape(nCols, nRows), axis=1) / np.sqrt(nSize)
 
         if KeepTheChange:
             SpareArr = arr[EqSize:].copy()
@@ -461,8 +460,11 @@ def rms_vs_binsize(residuals):
 
     bins_arr = np.ones(max_bin-1)
 
-    for k, binsize in tqdm(enumerate(range(min_bin, max_bin)),
-                           total=max_bin-min_bin):
+    progress_bins = tqdm(
+        enumerate(range(min_bin, max_bin)),
+        total=max_bin-min_bin
+    )
+    for k, binsize in progress_bins:
         n_points_per_bin = residuals.size // binsize
         res_bin, res_unc = bin_array(residuals, binsize=binsize)
         rms_v_bs[k+1] = res_bin.std()  # / np.sqrt(n_points_per_bin)
@@ -516,8 +518,8 @@ def plot_rms_vs_binsize(model_set, fluxes, model_rms_v_bs=None, bins_arr=None,
             ax.lines.pop()
             # Remove Gaussian theory model -- will be added again here
             ax.lines.pop()
-        except:
-            pass  # This is the first plot
+        except Exception as err:
+            print(f'[Error] {err}')  # This is the first plot
 
     # tmodel = model_set['transit_model']
     # transit_duration = np.where(tmodel < tmodel.max())[0]
@@ -624,46 +626,78 @@ def plot_fit_residuals_physics(
     phy_hist.yaxis.tick_right()
 
     # Raw Flux Plots
-    sub_ax_split(times_binned - times.mean(), ppm*(full_model_binned-1),
-                 [raw_scat, raw_hist], color=color_cycle[0],
-                 label='Binned Normalized Flux', markersize=markersize, alpha=alpha,
-                 lw=lw, mew=mew, points_per_bins=points_per_bins)
+    sub_ax_split(
+        times_binned - times.mean(),
+        ppm*(full_model_binned-1),
+        [raw_scat, raw_hist],
+        color=color_cycle[0],
+        label='Binned Normalized Flux',
+        markersize=markersize,
+        alpha=alpha,
+        lw=lw,
+        mew=mew,
+        points_per_bins=points_per_bins
+    )
 
-    raw_scat.errorbar(times_binned - times.mean(), ppm*(fluxes_binned-1),
-                      yerr=ppm*flux_errs_binned, fmt='.', mew=0, color=color_cycle[1],
-                      lw=lw, markersize=markersize, label='Full Initial Model', zorder=0,
-                      alpha=0.5)
+    raw_scat.errorbar(
+        times_binned - times.mean(),
+        ppm*(fluxes_binned-1),
+        yerr=ppm*flux_errs_binned,
+        fmt='.',
+        mew=0,
+        color=color_cycle[1],
+        lw=lw,
+        markersize=markersize,
+        label='Full Initial Model',
+        zorder=0,
+        alpha=0.5
+    )
 
     title = 'Binned Normalized Flux from {} - {}; {}; {}; {}; {}; {}'
-    title = title.format('Init', planet_name, channel, staticRad,
-                         varRad, method, plot_name)
+    title = title.format(
+        'Init', planet_name, channel, staticRad, varRad, method, plot_name
+    )
 
     raw_scat.set_title(title, **title_kwargs)
     raw_scat.set_xlabel('Time [days]', **label_kwargs)
     raw_scat.set_ylabel('Normalized Flux [ppm]', **label_kwargs)
 
     # Residual Flux Plots
-    yhist, xhist, _ = sub_ax_split(times_binned - times.mean(),
-                                   ppm*(fluxes_binned-full_model_binned),
-                                   [res_scat, res_hist], color=color_cycle[4],
-                                   returnHist=True, markersize=markersize, alpha=alpha,
-                                   lw=lw, mew=mew, points_per_bins=points_per_bins)
+    yhist, xhist, _ = sub_ax_split(
+        times_binned - times.mean(),
+        ppm*(fluxes_binned-full_model_binned),
+        [res_scat, res_hist],
+        color=color_cycle[4],
+        returnHist=True,
+        markersize=markersize,
+        alpha=alpha,
+        lw=lw,
+        mew=mew,
+        points_per_bins=points_per_bins
+    )
 
     title = 'Residuals from {} - {}; {}; {}; {}; {}; {}'
-    title = title.format('Init', planet_name, channel, staticRad,
-                         varRad, method, plot_name)
+    title = title.format(
+        'Init', planet_name, channel, staticRad, varRad, method, plot_name
+    )
     res_scat.set_title(title, **title_kwargs)
     res_scat.set_xlabel('Time [days]', **label_kwargs)
     res_scat.set_ylabel('Residuals [ppm]', **label_kwargs)
     res_scat.set_ylim(-ppm*nSig*std_res, ppm*nSig*std_res)
 
-    res_hist.annotate('{:.0f} ppm'.format(np.ceil(ppm*std_res)),
-                      (0.1*yhist.max(), np.ceil(1.1*ppm*std_res)),
-                      fontsize=label_kwargs['fontsize'], color='indigo')
+    res_hist.annotate(
+        f'{np.ceil(ppm*std_res):.0f} ppm',
+        (0.1*yhist.max(),
+         np.ceil(1.1*ppm*std_res)),
+        fontsize=label_kwargs['fontsize'],
+        color='indigo'
+    )
 
-    res_hist.annotate('{:.0f} ppm'.format(np.ceil(ppm*std_res)),
-                      (0.1*yhist.max(), np.ceil(-1.5*ppm*std_res)),
-                      fontsize=label_kwargs['fontsize'], color='indigo')
+    res_hist.annotate(
+        '{:.0f} ppm'.format(np.ceil(ppm*std_res)),
+        (0.1*yhist.max(), np.ceil(-1.5*ppm*std_res)),
+        fontsize=label_kwargs['fontsize'], color='indigo'
+    )
 
     res_hist.axhline(ppm*std_res, ls='--', color='indigo')
     res_hist.axhline(-ppm*std_res, ls='--', color='indigo')
@@ -673,20 +707,23 @@ def plot_fit_residuals_physics(
     physical = physical / line_model_binned / weirdness_binned
     physical = physical - 1.0
 
-    sub_ax_split(times_binned - times.mean(), ppm*physical,
-                 [phy_scat, phy_hist], color=color_cycle[0],
-                 markersize=markersize, alpha=alpha, lw=lw, mew=mew,
-                 points_per_bins=points_per_bins)
+    sub_ax_split(
+        times_binned - times.mean(), ppm*physical,
+        [phy_scat, phy_hist], color=color_cycle[0], markersize=markersize,
+        alpha=alpha, lw=lw, mew=mew, points_per_bins=points_per_bins)
 
     physical = physical_model_binned / line_model_binned - 1.0
-    phy_scat.plot(times_binned - times.mean(), ppm*physical,
-                  color=color_cycle[1], zorder=100)
+    phy_scat.plot(
+        times_binned - times.mean(), ppm*physical, color=color_cycle[1],
+        zorder=100
+    )
 
     phy_scat.axhline(0.0, ls='--', color=color_cycle[2])
 
     title = 'Physics Only from {} - {}; {}; {}; {}; {}; {}'
-    title = title.format('Init', planet_name, channel, staticRad,
-                         varRad, method, plot_name)
+    title = title.format(
+        'Init', planet_name, channel, staticRad, varRad, method, plot_name
+    )
     phy_scat.set_title(title, **title_kwargs)
     phy_scat.set_xlabel('Time [days]', **label_kwargs)
     phy_scat.set_ylabel('Residuals [ppm]', **label_kwargs)
@@ -710,13 +747,14 @@ def plot_fit_residuals_physics(
 
     if save_now:
         plot_save_name = '{}_{}_{}_{}_{}_{}_fit_residuals_physics_{}.png'
-        plot_save_name = plot_save_name.format(planet_name.replace(' b', 'b'),
-                                               channel, staticRad,
-                                               varRad, method,
-                                               plot_name, time_stamp)
+        plot_save_name = plot_save_name.format(
+            planet_name.replace(' b', 'b'), channel, staticRad, varRad, method,
+            plot_name, time_stamp
+        )
 
-        print('Saving Initial Fit Residuals Plot to {}'.format(
-            save_dir + plot_save_name))
+        print(
+            f'Saving Initial Fit Residuals Plot to {save_dir + plot_save_name}'
+        )
 
         fig.savefig(save_dir + plot_save_name)
 
