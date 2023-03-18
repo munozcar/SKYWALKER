@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 
 from dataclasses import dataclass
-from matplotlib import plt
+from matplotlib import pyplot as plt
 from scipy import spatial
 from tqdm import tqdm
 
@@ -78,7 +78,7 @@ def removeOutliers(
 
 
 @dataclass
-class ExoplantTSOData:
+class ExoplanetTSOData:
     fluxes: pd.DataFrame = None
     times: np.ndarray = None
     flux_errs: pd.DataFrame = None
@@ -93,20 +93,22 @@ class ExoplantTSOData:
 @dataclass
 class SpitzerNoiseModelConfig:
     knots: np.ndarray = None
-    nearIndices: np.ndarray = None
+    near_indices: np.ndarray = None
     ind_kdtree: np.ndarray = None
     gw_kdtree: np.ndarray = None
 
 
 def output_data_from_file(
-        dataDir=None, wanderer=None, flux_key='phots',
+        data_dir=None, wanderer=None, flux_key='phots',
+        # flux_key = 'gaussian_fit_annular_mask_rad_2.5_0.0',
         time_key='times', flux_err_key='noise', eff_width_key='npix',
         pld_coeff_key='pld', ycenter_key='ycenters', xcenter_key='xcenters',
         ywidth_key='ywidths', xwidth_key='xwidths'):
 
-    if dataDir is not None:
+    tso_data = ExoplanetTSOData()
+    if data_dir is not None:
         extracted_data = extractData(
-            file=dataDir,
+            file=data_dir,
             flux_key=flux_key,
             time_key=time_key,
             flux_err_key=flux_err_key,
@@ -118,31 +120,30 @@ def output_data_from_file(
             xwidth_key=xwidth_key
         )
 
-        fluxes = extracted_data[0]
-        times = extracted_data[1]
-        flux_errs = extracted_data[2]
-        npix = extracted_data[3]
-        pld_intensities = extracted_data[4]
-        xcenters = extracted_data[5]
-        ycenters = extracted_data[6]
-        xwidths = extracted_data[7]
-        ywidths = extracted_data[8]
+        tso_data.fluxes = extracted_data[0]
+        tso_data.times = extracted_data[1]
+        tso_data.flux_errs = extracted_data[2]
+        tso_data.npix = extracted_data[3]
+        tso_data.pld_intensities = extracted_data[4]
+        tso_data.xcenters = extracted_data[5]
+        tso_data.ycenters = extracted_data[6]
+        tso_data.xwidths = extracted_data[7]
+        tso_data.ywidths = extracted_data[8]
 
     elif wanderer is not None:
-        flux_key = 'gaussian_fit_annular_mask_rad_2.5_0.0'
-        fluxes = wanderer.flux_tso_df[flux_key]
-        times = wanderer.time_cube
-        flux_errs = wanderer.noise_tso_df[flux_key]
-        npix = wanderer.effective_widths
-        pld_intensities = wanderer.pld_components
-        # pld_intensities = wanderer.pld_norm
-        ycenters = wanderer.centering_df[ycenter_key].copy()
-        xcenters = wanderer.centering_df[xcenter_key].copy()
-        ywidths = wanderer.widths_gaussian_fit[:, x]
-        xwidths = wanderer.widths_gaussian_fit[:, y]
 
-    return fluxes, times, flux_errs, npix, pld_intensities, xcenters, \
-        ycenters, xwidths, ywidths
+        tso_data.fluxes = wanderer.flux_tso_df[flux_key]
+        tso_data.times = wanderer.time_cube
+        tso_data.flux_errs = wanderer.noise_tso_df[flux_key]
+        tso_data.npix = wanderer.effective_widths
+        tso_data.pld_intensities = wanderer.pld_components
+        # tso_data.pld_intensities = wanderer.pld_norm
+        tso_data.ycenters = wanderer.centering_df[ycenter_key].copy()
+        tso_data.xcenters = wanderer.centering_df[xcenter_key].copy()
+        tso_data.ywidths = wanderer.widths_gaussian_fit[:, x]
+        tso_data.xwidths = wanderer.widths_gaussian_fit[:, y]
+
+    return tso_data
 
 
 def configure_spitzer_noise_models(
@@ -159,7 +160,7 @@ def configure_spitzer_noise_models(
 
         print(f'BLISS will use a total of {len(knots)} knots')
         knotTree = spatial.cKDTree(knots)
-        nearIndices = bliss.nearestIndices(
+        near_indices = bliss.nearestIndices(
             xcenters[keep_inds],
             ycenters[keep_inds],
             knotTree
@@ -189,19 +190,25 @@ def configure_spitzer_noise_models(
         )
 
         knots = None
-        nearIndices = None
+        near_indices = None
     elif 'pld' in method.lower():
         print('Using PLD')
         ind_kdtree = None
         gw_kdtree = None
         knots = None
-        nearIndices = None
+        near_indices = None
 
-    return knots, nearIndices, ind_kdtree, gw_kdtree
+    noise_model_config = SpitzerNoiseModelConfig()
+    noise_model_config.knots = knots
+    noise_model_config.near_indices = near_indices
+    noise_model_config.ind_kdtree = ind_kdtree
+    noise_model_config.gw_kdtree = gw_kdtree
+
+    return noise_model_config
 
 
 def setup_inputs_from_file(
-        dataDir=None, wanderer=None, x_bin_size=0.1, y_bin_size=0.1,
+        data_dir=None, wanderer=None, x_bin_size=0.1, y_bin_size=0.1,
         xSigmaRange=4, ySigmaRange=4, fSigmaRange=4, flux_key='phots',
         time_key='times', flux_err_key='noise', eff_width_key='npix',
         pld_coeff_key='pld', ycenter_key='ycenters', xcenter_key='xcenters',
@@ -222,7 +229,7 @@ def setup_inputs_from_file(
         Written by C.Munoz-Romero 07-05-18
         Edited by J.Fraine 07-06-18
     Args:
-        dataDir (str): the directory location for the joblib file containing
+        data_dir (str): the directory location for the joblib file containing
         the x,y,flux information.
         wanderer (Wanderer): instance of class Wanderer from Wanderer
             ExoplantTSO photometric extraction package
@@ -239,7 +246,7 @@ def setup_inputs_from_file(
         flux_err (nDarray): photon uncertainties
         knots (nDarray): locations and initial flux values (weights) for
         interpolation grid.
-        nearIndices (nDarray): nearest neighbour indices per point for location
+        near_indices (nDarray): nearest neighbour indices per point for location
         of nearest knots keep_inds (list): list of indicies to keep within the
         thresholds set.
     """
@@ -249,8 +256,8 @@ def setup_inputs_from_file(
 
     print(f'Setting up inputs for {method}.')
 
-    data_from_file = output_data_from_file(
-        dataDir=dataDir,
+    tso_data = output_data_from_file(
+        data_dir=data_dir,
         wanderer=wanderer,
         flux_key=flux_key,
         time_key=time_key,
@@ -263,20 +270,10 @@ def setup_inputs_from_file(
         xwidth_key=xwidth_key
     )
 
-    fluxes = data_from_file[0]
-    times = data_from_file[1]
-    flux_errs = data_from_file[2]
-    npix = data_from_file[3]
-    pld_intensities = data_from_file[4]
-    xcenters = data_from_file[5]
-    ycenters = data_from_file[6]
-    xwidths = data_from_file[7]
-    ywidths = data_from_file[8]
-
     # fluxes is None by default for now...
     keep_inds = removeOutliers(
-        xcenters,
-        ycenters,
+        tso_data.xcenters,
+        tso_data.ycenters,
         fluxes=None,
         x_sigma_cutoff=xSigmaRange,
         y_sigma_cutoff=ySigmaRange,
@@ -284,23 +281,16 @@ def setup_inputs_from_file(
     )
 
     noise_model_config = configure_spitzer_noise_models(
-        ycenters,
-        xcenters,
-        npix,
+        tso_data.ycenters,
+        tso_data.xcenters,
+        tso_data.npix,
         y_bin_size,
         x_bin_size,
         keep_inds,
         method
     )
 
-    knots = noise_model_config[0]
-    nearIndices = noise_model_config[1]
-    ind_kdtree = noise_model_config[2]
-    gw_kdtree = noise_model_config[3]
-
-    return fluxes, times, flux_errs, npix, pld_intensities, xcenters, \
-        ycenters, xwidths, ywidths, knots, nearIndices, keep_inds, \
-        ind_kdtree, gw_kdtree
+    return tso_data, noise_model_config, keep_inds
 
 
 def exoparams_to_lmfit_params(planet_name):
