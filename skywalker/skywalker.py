@@ -8,8 +8,13 @@ from . import bliss
 from . import krdata as kr
 from . import utils
 from . import models
-from .models import line_model_func, trapezoid_model, transit_model_func
-from .models import phase_curve_func
+from .models import (
+    line_model_func,
+    trapezoid_model,
+    transit_model_func,
+    phase_curve_func,
+    compute_sensitivity_map
+)
 
 # Import external dependencies and methods.
 import numpy as np
@@ -157,7 +162,7 @@ def add_trap_to_phase_curve_model(
 def instantiate_system(
         planet_input,
         fpfs=0.0,
-        u_params=[0.0, 0.0],
+        u_params=None,
         phase_curve_amp_1_0=0.0,
         phase_curve_amp_1n1=0.0,
         phase_curve_amp_1p1=0.0,
@@ -171,14 +176,17 @@ def instantiate_system(
     """
     try:
         from starry import kepler
-    except:
+    except Exception as e:
+        print(f'Exception: {e}')
         raise ImportError(
             '`starry` (github.com/rodluger/starry)'
             ' is required to run this operation.'
             ' Try `pip install starry`\n'
             '	 `conda install starry`\n'
             ' or  `pip install git+https://github.com/rodluger/starry`'
-        )
+        ) from e
+
+    u_params = [0.0, 0.0] if u_params is None else u_params
 
     if isinstance(planet_input, str):
         planet_info = exoMAST_API(planet_input)
@@ -347,8 +355,8 @@ def generate_local_times(
     if transit_loc is None:
         n_events -= 1
 
-    assert (n_events > 0), "Error: Somehow the number of events is "\
-        "less than 0"
+    assert (n_events > 0), \
+        "Error: Somehow the number of events is less than 0"
 
     n_pts_per_event = times.size * interp_ratio/n_events
     times_local = np.linspace(times.min(), times.max(), n_pts_per_event)
@@ -421,7 +429,7 @@ def compute_full_model_starry(
     if 'intercept' not in model_params.keys():
         include_polynomial = False
 
-    line_model = models.line_model_func(model_params, times_local) \
+    line_model = line_model_func(model_params, times_local) \
         if include_polynomial else 1.0
 
     # non-systematics model (i.e. (star + planet) / star
@@ -462,12 +470,12 @@ def compute_full_model_normal(
         include_phase_curve = False
 
     if include_polynomial:
-        line_model = models.line_model_func(model_params, times)
+        line_model = line_model_func(model_params, times)
     else:
         line_model = 1.0
 
     if include_transit:
-        transit_model = models.transit_model_func(
+        transit_model = transit_model_func(
             model_params, times, init_t0, transitType='primary'
         )
     else:
@@ -475,17 +483,16 @@ def compute_full_model_normal(
 
     if include_eclipse:
         if use_trap:
-            eclipse_model = models.trapezoid_model(
-                model_params, times, init_t0)
+            eclipse_model = trapezoid_model(model_params, times, init_t0)
         else:
-            eclipse_model = models.transit_model_func(
+            eclipse_model = transit_model_func(
                 model_params, times, init_t0, transitType='secondary'
             )
     else:
         eclipse_model = 1.0
 
     if include_phase_curve:
-        phase_curve_model = models.phase_curve_func(
+        phase_curve_model = phase_curve_func(
             model_params, times, init_t0
         )
     else:
@@ -501,7 +508,8 @@ def compute_full_model_normal(
 
     try:
         model_params['edepth'].value = phase_curve_model[ecl_bottom].max()-1.0
-    except:
+    except Exception as e:
+        print(f'Exception: {e}')
         model_params['edepth'].value = 0.0
 
     mutl_ecl = True
@@ -548,7 +556,8 @@ def compute_full_model_normal(
     try:
         if np.allclose(phase_curve_model, np.ones(phase_curve_model.size)):
             mutl_ecl = True
-    except:
+    except Exception as e:
+        print(f'Exception: {e}')
         mutl_ecl = False
 
     if eclipse_option == 'batman':
@@ -583,7 +592,7 @@ def compute_full_model(
         planet_input=None, planet=None,
         star=None, system=None, lmax=2):
 
-    if fit_function is 'starry':
+    if fit_function == 'starry':
         return compute_full_model_starry(
             model_params,
             times,
@@ -629,7 +638,7 @@ def process_weirdness(times, model_params):
 def residuals_func(
         model_params, times, xcenters, ycenters, fluxes, flux_errs,
         keep_inds, planet=None, star=None, system=None,
-        planet_info=None, knots=None, method=None, nearIndices=None,
+        planet_info=None, knots=None, method=None, near_indicess=None,
         ind_kdtree=None, gw_kdtree=None, pld_intensities=None,
         x_bin_size=0.1, y_bin_size=0.1, transit_indices=None,
         include_transit=True, include_eclipse=True,
@@ -668,14 +677,14 @@ def residuals_func(
 
     residuals = fluxes / physical_model
     start0 = time()
-    sensitivity_map = models.compute_sensitivity_map(
+    sensitivity_map = compute_sensitivity_map(
         model_params=model_params,
         method=method,
         xcenters=xcenters,
         ycenters=ycenters,
         residuals=residuals,
         knots=knots,
-        nearIndices=nearIndices,
+        near_indicess=near_indicess,
         xBinSize=x_bin_size,
         yBinSize=y_bin_size,
         ind_kdtree=ind_kdtree,
@@ -700,7 +709,7 @@ def residuals_func_multiepoch(
         model_params, times_list, xcenters_list,
         ycenters_list, fluxes_list,
         flux_errs_list, keep_inds_list,
-        knots_list=None, nearIndices_list=None,
+        knots_list=None, near_indicess_list=None,
         ind_kdtree_list=None, gw_kdtree_list=None,
         pld_intensities_list=None,
         method=None, x_bin_size=0.1, y_bin_size=0.1,
@@ -726,7 +735,7 @@ def residuals_func_multiepoch(
         flux_errs_list,
         keep_inds_list,
         knots_list,
-        nearIndices_list,
+        near_indicess_list,
         ind_kdtree_list,
         gw_kdtree_list,
         pld_intensities_list
@@ -734,7 +743,7 @@ def residuals_func_multiepoch(
 
     for epoch, zippidy_day in enumerate(zippidy_do_dah):
         times, xcenters, ycenters, fluxes, flux_errs, keep_inds, knots, \
-            nearIndices, ind_kdtree, gw_kdtree, pld_intensities = zippidy_day
+            near_indicess, ind_kdtree, gw_kdtree, pld_intensities = zippidy_day
 
         intercept_epoch = model_params_single[f'intercept{epoch}']
         slope_epoch = model_params_single[f'slope{epoch}']
@@ -754,7 +763,7 @@ def residuals_func_multiepoch(
             keep_inds,
             knots=knots,
             method=method,
-            nearIndices=nearIndices,
+            near_indicess=near_indicess,
             ind_kdtree=ind_kdtree,
             gw_kdtree=gw_kdtree,
             pld_intensities=pld_intensities,
@@ -799,7 +808,7 @@ def map_fit_params(fit_params, fit_param_names, model_params):
 def chisq_func_scipy(
         fit_params, fit_param_names, model_params, times,
         xcenters, ycenters, fluxes, flux_errs, knots, keep_inds,
-        method=None, nearIndices=None, ind_kdtree=None,
+        method=None, near_indicess=None, ind_kdtree=None,
         gw_kdtree=None, pld_intensities=None, x_bin_size=0.1,
         y_bin_size=0.1, transit_indices=None,
         include_transit=True, include_eclipse=True,
@@ -824,7 +833,7 @@ def chisq_func_scipy(
         knots,
         keep_inds,
         method=method,
-        nearIndices=nearIndices,
+        near_indicess=near_indicess,
         ind_kdtree=ind_kdtree,
         gw_kdtree=gw_kdtree,
         pld_intensities=pld_intensities,
@@ -846,14 +855,28 @@ def chisq_func_scipy(
 
 
 def generate_best_fit_solution(
-        model_params, times, xcenters, ycenters, fluxes,
-        knots, keep_inds, planet_info,
-        method=None, nearIndices=None, ind_kdtree=None,
-        gw_kdtree=None, pld_intensities=None,
-        x_bin_size=0.1, y_bin_size=0.1,
-        transit_indices=None, fit_function='starry',
-        interpolate=False, interp_ratio=0.1,
-        star=None, planet=None, system=None,
+        model_params,
+        times,
+        xcenters,
+        ycenters,
+        fluxes,
+        knots,
+        keep_inds,
+        planet_info,
+        method=None,
+        near_indicess=None,
+        ind_kdtree=None,
+        gw_kdtree=None,
+        pld_intensities=None,
+        x_bin_size=0.1,
+        y_bin_size=0.1,
+        transit_indices=None,
+        fit_function='starry',
+        interpolate=False,
+        interp_ratio=0.1,
+        star=None,
+        planet=None,
+        system=None,
         include_transit=True,
         include_eclipse=True,
         include_phase_curve=True,
@@ -884,14 +907,14 @@ def generate_best_fit_solution(
             or 'pld' in method.lower()), "No valid method selected."
 
     residuals = fluxes / output['physical_model']
-    sensitivity_map = models.compute_sensitivity_map(
+    sensitivity_map = compute_sensitivity_map(
         model_params=model_params,
         method=method,
         xcenters=xcenters,
         ycenters=ycenters,
         residuals=residuals,
         knots=knots,
-        nearIndices=nearIndices,
+        near_indicess=near_indicess,
         xBinSize=x_bin_size,
         yBinSize=y_bin_size,
         ind_kdtree=ind_kdtree,
@@ -918,7 +941,7 @@ def generate_best_fit_solution(
 def generate_best_fit_solution_scipy(
         fit_params, fit_param_names, model_params,
         times, xcenters, ycenters, fluxes, knots, keep_inds,
-        method=None, nearIndices=None, ind_kdtree=None,
+        method=None, near_indicess=None, ind_kdtree=None,
         gw_kdtree=None, pld_intensities=None, x_bin_size=0.1,
         y_bin_size=0.1, transit_indices=None,
         include_transit=True, include_eclipse=True,
@@ -942,7 +965,7 @@ def generate_best_fit_solution_scipy(
         knots,
         keep_inds,
         method=method,
-        nearIndices=nearIndices,
+        near_indicess=near_indicess,
         ind_kdtree=ind_kdtree,
         gw_kdtree=gw_kdtree,
         pld_intensities=pld_intensities,
