@@ -5,6 +5,7 @@ import pandas as pd
 from dataclasses import dataclass
 from matplotlib import pyplot as plt
 from scipy import spatial
+from statsmodels.robust import scale
 from tqdm import tqdm
 
 from . import bliss
@@ -52,27 +53,26 @@ def nearest(xc, yc, neighbors, tree):
     return neighbors[1]
 
 
-def removeOutliers(
-        xcenters, ycenters, fluxes=None, x_sigma_cutoff=3,
-        y_sigma_cutoff=4, f_sigma_cutoff=4):
+def identify_outliers(
+        xcenters, ycenters, fluxes=None, x_sigma=4, y_sigma=4, f_sigma=4):
     """
         Args:
         xcenters (nDarray): array of x-coordinates of centers.
         ycenters (nDarray): array of y-coordinates of centers.
         fluxes (list or None): None or array of fluxes associated with the
                 centers. (if fluxes is None, then skip 3rd dimension)
-        x_sigma_cutoff (float): how many standard deviatins to accept in x.
-        y_sigma_cutoff (float): how many standard deviatins to accept in y.
-        f_sigma_cutoff (float): how many standard deviatins to accept in y.
+        x_sigma (float): how many standard deviatins to accept in x.
+        y_sigma (float): how many standard deviatins to accept in y.
+        f_sigma (float): how many standard deviatins to accept in y.
         Returns:
         boolean list: list of indices to keep as inliers
     """
-    x_ell = ((xcenters - xcenters.mean())/x_sigma_cutoff)**2.  # x-ellipse term
-    y_ell = ((ycenters - ycenters.mean())/y_sigma_cutoff)**2.  # y-ellipse term
+    x_ell = ((xcenters - np.median(xcenters))/x_sigma)**2.  # x-ellipse term
+    y_ell = ((ycenters - np.median(ycenters))/y_sigma)**2.  # y-ellipse term
 
     if fluxes is not None:
         # flux-ellipse term
-        f_ell = ((fluxes - fluxes.mean())/f_sigma_cutoff)**2.
+        f_ell = ((fluxes - fluxes.mean())/f_sigma)**2.
 
     return y_ell+x_ell+f_ell < 1 if fluxes is not None else y_ell+x_ell < 1
 
@@ -98,12 +98,74 @@ class SpitzerNoiseModelConfig:
     gw_kdtree: np.ndarray = None
 
 
+def clean_input_data(
+        tso_data,  # flux_key, ycenter_key, xcenter_key,
+        outlier_reject=False, n_sig=5):
+
+    y, x = 0, 1
+    keep_flux = np.isfinite(tso_data.fluxes)
+    keep_flux = np.bitwise_and(
+        keep_flux, np.isfinite(tso_data.times)
+    )
+    keep_flux = np.bitwise_and(
+        keep_flux, np.isfinite(tso_data.flux_errs)
+    )
+    keep_flux = np.bitwise_and(
+        keep_flux, np.isfinite(tso_data.npix)
+    )
+    # keep_flux = np.bitwise_and(
+    #    keep_flux, np.isfinite(wanderer.pld_intensities)
+    # )
+
+    keep_flux = np.bitwise_and(
+        keep_flux, np.isfinite(tso_data.ycenters)
+    )
+    keep_flux = np.bitwise_and(
+        keep_flux, np.isfinite(tso_data.xcenters)
+    )
+    keep_flux = np.bitwise_and(
+        keep_flux, np.isfinite(tso_data.ywidths)
+    )
+    keep_flux = np.bitwise_and(
+        keep_flux, np.isfinite(tso_data.xwidths)
+    )
+
+    if outlier_reject:
+        mad2std = 1.4826
+        fluxes = tso_data.fluxes.copy()
+        med_flux = np.median(fluxes)
+        std_flux = scale.mad(fluxes) * mad2std
+        bound_flux = np.abs(fluxes - med_flux) < n_sig * std_flux
+        keep_flux = np.bitwise_and(keep_flux, bound_flux)
+
+    tso_data.fluxes = tso_data.fluxes.copy()[keep_flux]
+    tso_data.times = tso_data.times.copy()[keep_flux]
+    tso_data.flux_errs = tso_data.flux_errs.copy()[keep_flux]
+    tso_data.npix = tso_data.npix.copy()[keep_flux]
+    # tso_data.pld_intensities = tso_data.pld_intensities[:, keep_flux]
+    tso_data.ycenters = tso_data.ycenters[keep_flux]
+    tso_data.xcenters = tso_data.xcenters[keep_flux]
+    tso_data.ywidths = tso_data.ywidths[keep_flux]
+    tso_data.xwidths = tso_data.xwidths[keep_flux]
+
+    # tso_data.fluxes.reset_index(inplace=True)
+    # tso_data.flux_errs.reset_index(inplace=True)
+    # tso_data.ycenters.reset_index(inplace=True)
+    # tso_data.xcenters.reset_index(inplace=True)
+
+    print(keep_flux.sum(), keep_flux.size)
+
+    return tso_data
+
+
 def output_data_from_file(
-        data_dir=None, wanderer=None, flux_key='phots',
-        # flux_key = 'gaussian_fit_annular_mask_rad_2.5_0.0',
-        time_key='times', flux_err_key='noise', eff_width_key='npix',
-        pld_coeff_key='pld', ycenter_key='ycenters', xcenter_key='xcenters',
-        ywidth_key='ywidths', xwidth_key='xwidths'):
+        data_dir=None, wanderer=None, outlier_reject=None, n_sig=5,
+        flux_key='phots', time_key='times', flux_err_key='noise',
+        eff_width_key='npix', pld_coeff_key='pld', ycenter_key='ycenters',
+        xcenter_key='xcenters', ywidth_key='ywidths', xwidth_key='xwidths'):
+
+    # flux_key = 'gaussian_fit_annular_mask_rad_2.5_0.0',
+    # sourcery skip: extract-method
 
     tso_data = ExoplanetTSOData()
     if data_dir is not None:
@@ -131,72 +193,74 @@ def output_data_from_file(
         tso_data.ywidths = extracted_data[8]
 
     elif wanderer is not None:
-
-        tso_data.fluxes = wanderer.flux_tso_df[flux_key]
+        tso_data.fluxes = wanderer.flux_tso_df[flux_key].values
         tso_data.times = wanderer.time_cube
-        tso_data.flux_errs = wanderer.noise_tso_df[flux_key]
+        tso_data.flux_errs = wanderer.noise_tso_df[flux_key].values
         tso_data.npix = wanderer.effective_widths
         tso_data.pld_intensities = wanderer.pld_components
         # tso_data.pld_intensities = wanderer.pld_norm
-        tso_data.ycenters = wanderer.centering_df[ycenter_key].copy()
-        tso_data.xcenters = wanderer.centering_df[xcenter_key].copy()
-        tso_data.ywidths = wanderer.widths_gaussian_fit[:, x]
-        tso_data.xwidths = wanderer.widths_gaussian_fit[:, y]
+        tso_data.ycenters = wanderer.centering_df[ycenter_key].values
+        tso_data.xcenters = wanderer.centering_df[xcenter_key].values
+        tso_data.ywidths = wanderer.widths_gaussian_fit[:, y]
+        tso_data.xwidths = wanderer.widths_gaussian_fit[:, x]
 
+    tso_data = clean_input_data(
+        tso_data,  # , flux_key, ycenter_key, xcenter_key
+        outlier_reject=outlier_reject,
+        n_sig=5
+    )
     return tso_data
 
 
-def configure_spitzer_noise_models(
-        ycenters, xcenters, npix, y_bin_size, x_bin_size, keep_inds, method):
+def configure_bliss_noise_models(ycenters, xcenters, y_bin_size, x_bin_size):
 
-    if 'bliss' in method.lower():
-        print('Setting up BLISS')
-        knots = bliss.createGrid(
-            xcenters[keep_inds],
-            ycenters[keep_inds],
-            x_bin_size,
-            y_bin_size
-        )
+    print('Setting up BLISS')
+    knots = bliss.createGrid(
+        xcenters,
+        ycenters,
+        x_bin_size,
+        y_bin_size
+    )
 
-        print(f'BLISS will use a total of {len(knots)} knots')
-        knotTree = spatial.cKDTree(knots)
-        near_indices = bliss.nearestIndices(
-            xcenters[keep_inds],
-            ycenters[keep_inds],
-            knotTree
-        )
+    print(f'BLISS will use a total of {len(knots)} knots')
+    knotTree = spatial.cKDTree(knots)
+    near_indices = bliss.nearestIndices(
+        xcenters,
+        ycenters,
+        knotTree
+    )
 
-        ind_kdtree = None
-        gw_kdtree = None
-    elif 'krdata' in method.lower():
-        print('Setting up KRDATA')
-        n_nbr = 100
-        expansion = 1000
+    noise_model_config = SpitzerNoiseModelConfig()
+    noise_model_config.knots = knots
+    noise_model_config.near_indices = near_indices
 
-        xpos = xcenters[keep_inds] - np.nanmedian(xcenters[keep_inds])
-        ypos = (ycenters[keep_inds] - np.nanmedian(ycenters[keep_inds]))/0.7
-        np0 = np.sqrt(npix[keep_inds])
-        np0 = (np0 - np.nanmedian(np0))
+    return noise_model_config
 
-        points = np.transpose([xpos, ypos, np0])
-        kdtree = spatial.cKDTree(points * expansion)
 
-        ind_kdtree = kdtree.query(kdtree.data, n_nbr+1)[1][:, 1:]
-        gw_kdtree = kr.gaussian_weights_and_nearest_neighbors(
-            xpos=xpos,
-            ypos=ypos,
-            npix=np0,
-            inds=ind_kdtree
-        )
+def configure_krdata_noise_models(
+        ycenters, xcenters, npix, ymod=0.7, n_nbr=100):
 
-        knots = None
-        near_indices = None
-    elif 'pld' in method.lower():
-        print('Using PLD')
-        ind_kdtree = None
-        gw_kdtree = None
-        knots = None
-        near_indices = None
+    print('Setting up KRDATA')
+    expansion = 1000
+
+    xpos = xcenters - np.nanmedian(xcenters)
+    ypos = (ycenters - np.nanmedian(ycenters))/ymod
+    np0 = np.sqrt(npix)
+    np0 = (np0 - np.nanmedian(np0))
+
+    points = np.transpose([xpos, ypos, np0])
+    kdtree = spatial.cKDTree(points * expansion)
+
+    ind_kdtree = kdtree.query(kdtree.data, n_nbr+1)[1][:, 1:]
+    gw_kdtree = kr.gaussian_weights_and_nearest_neighbors(
+        xpos=xpos,
+        ypos=ypos,
+        npix=np0,
+        inds=ind_kdtree
+    )
+
+    knots = None
+    near_indices = None
 
     noise_model_config = SpitzerNoiseModelConfig()
     noise_model_config.knots = knots
@@ -207,9 +271,39 @@ def configure_spitzer_noise_models(
     return noise_model_config
 
 
+def configure_pld_noise_models():
+
+    print('Using PLD')
+    return SpitzerNoiseModelConfig()
+
+
+def configure_spitzer_noise_models(
+        ycenters, xcenters, npix, y_bin_size, x_bin_size, keep_inds, method):
+
+    if 'bliss' in method.lower():
+        return configure_bliss_noise_models(
+            ycenters=ycenters,
+            xcenters=xcenters,
+            y_bin_size=y_bin_size,
+            x_bin_size=x_bin_size,
+            keep_inds=keep_inds
+        )
+    elif 'krdata' in method.lower():
+        return configure_krdata_noise_models(
+            ycenters.copy(),
+            xcenters.copy(),
+            npix.copy(),
+            keep_inds,
+            ymod=0.7,
+            n_nbr=100
+        )
+    elif 'pld' in method.lower():
+        return configure_pld_noise_models()
+
+
 def setup_inputs_from_file(
         data_dir=None, wanderer=None, x_bin_size=0.1, y_bin_size=0.1,
-        xSigmaRange=4, ySigmaRange=4, fSigmaRange=4, flux_key='phots',
+        x_sigma=4, y_sigma=4, f_sigma=4, outlier_reject=False, flux_key='phots',
         time_key='times', flux_err_key='noise', eff_width_key='npix',
         pld_coeff_key='pld', ycenter_key='ycenters', xcenter_key='xcenters',
         ywidth_key='ywidths', xwidth_key='xwidths', method=None):
@@ -235,9 +329,9 @@ def setup_inputs_from_file(
             ExoplantTSO photometric extraction package
         x_bin_size (float): distance in x-dimension to space interpolation grid
         y_bin_size (float): distance in y-dimension to space interpolation grid
-        xSigmaRange (float): relative distance in gaussian sigma space to
+        x_sigma (float): relative distance in gaussian sigma space to
         reject x-outliers
-        ySigmaRange (float): relative distance in gaussian sigma space to
+        y_sigma (float): relative distance in gaussian sigma space to
         reject y-outliers
     Returns:
         xcenters (nDarray): X positions for centering analysis
@@ -259,6 +353,7 @@ def setup_inputs_from_file(
     tso_data = output_data_from_file(
         data_dir=data_dir,
         wanderer=wanderer,
+        outlier_reject=outlier_reject,
         flux_key=flux_key,
         time_key=time_key,
         flux_err_key=flux_err_key,
@@ -267,23 +362,23 @@ def setup_inputs_from_file(
         ycenter_key=ycenter_key,
         xcenter_key=xcenter_key,
         ywidth_key=ywidth_key,
-        xwidth_key=xwidth_key
+        xwidth_key=xwidth_key,
     )
 
     # fluxes is None by default for now...
-    keep_inds = removeOutliers(
-        tso_data.xcenters,
-        tso_data.ycenters,
+    keep_inds = identify_outliers(
+        xcenters=tso_data.xcenters,
+        ycenters=tso_data.ycenters,
         fluxes=None,
-        x_sigma_cutoff=xSigmaRange,
-        y_sigma_cutoff=ySigmaRange,
-        f_sigma_cutoff=fSigmaRange
+        x_sigma=x_sigma,
+        y_sigma=y_sigma,
+        f_sigma=f_sigma
     )
 
     noise_model_config = configure_spitzer_noise_models(
-        tso_data.ycenters,
-        tso_data.xcenters,
-        tso_data.npix,
+        tso_data.ycenters.copy(),
+        tso_data.xcenters.copy(),
+        tso_data.npix.copy(),
         y_bin_size,
         x_bin_size,
         keep_inds,
@@ -556,8 +651,8 @@ def plot_rms_vs_binsize(model_set, fluxes, model_rms_v_bs=None, bins_arr=None,
 
 def plot_fit_residuals_physics(
         times, fluxes, flux_errs, model_set,
-        planet_name='', channel='', staticRad='',
-        varRad='', method='', plot_name='', time_stamp='',
+        planet_name='', channel='', static_rad='',
+        var_rad='', method='', plot_name='', time_stamp='',
         nSig=3, save_now=False, bin_size=10,
         label_kwargs={}, title_kwargs={},
         color_cycle=None, hspace=3.0, figsize=None,
@@ -597,7 +692,7 @@ def plot_fit_residuals_physics(
     else:
         weirdness_binned = 1.0
 
-    std_res = np.std(fluxes_binned-full_model_binned)
+    std_res = np.std(fluxes_binned - full_model_binned)
 
     # Set up the axes with gridspec
     fig = plt.figure(figsize=figsize)
@@ -645,7 +740,7 @@ def plot_fit_residuals_physics(
 
     title = 'Binned Normalized Flux from {} - {}; {}; {}; {}; {}; {}'
     title = title.format(
-        'Init', planet_name, channel, staticRad, varRad, method, plot_name
+        'Init', planet_name, channel, static_rad, var_rad, method, plot_name
     )
 
     raw_scat.set_title(title, **title_kwargs)
@@ -668,7 +763,7 @@ def plot_fit_residuals_physics(
 
     title = 'Residuals from {} - {}; {}; {}; {}; {}; {}'
     title = title.format(
-        'Init', planet_name, channel, staticRad, varRad, method, plot_name
+        'Init', planet_name, channel, static_rad, var_rad, method, plot_name
     )
     res_scat.set_title(title, **title_kwargs)
     res_scat.set_xlabel('Time [days]', **label_kwargs)
@@ -677,8 +772,7 @@ def plot_fit_residuals_physics(
 
     res_hist.annotate(
         f'{np.ceil(ppm*std_res):.0f} ppm',
-        (0.1*yhist.max(),
-         np.ceil(1.1*ppm*std_res)),
+        (0.1*yhist.max(), np.ceil(1.1*ppm*std_res)),
         fontsize=label_kwargs['fontsize'],
         color='indigo'
     )
@@ -712,7 +806,7 @@ def plot_fit_residuals_physics(
 
     title = 'Physics Only from {} - {}; {}; {}; {}; {}; {}'
     title = title.format(
-        'Init', planet_name, channel, staticRad, varRad, method, plot_name
+        'Init', planet_name, channel, static_rad, var_rad, method, plot_name
     )
     phy_scat.set_title(title, **title_kwargs)
     phy_scat.set_xlabel('Time [days]', **label_kwargs)
@@ -738,7 +832,8 @@ def plot_fit_residuals_physics(
     if save_now:
         plot_save_name = '{}_{}_{}_{}_{}_{}_fit_residuals_physics_{}.png'
         plot_save_name = plot_save_name.format(
-            planet_name.replace(' b', 'b'), channel, staticRad, varRad, method,
+            planet_name.replace(
+                ' b', 'b'), channel, static_rad, var_rad, method,
             plot_name, time_stamp
         )
 

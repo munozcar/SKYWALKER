@@ -27,6 +27,7 @@ import json
 import matplotlib
 import matplotlib.pyplot as plt
 
+from dataclasses import dataclass
 from exomast_api import exoMAST_API
 from os import environ
 from pandas import DataFrame
@@ -45,6 +46,15 @@ ppm = 1e6
 day_to_seconds = 86400
 zero = 0.0
 # Function definitions
+
+
+@dataclass
+class PhaseCurveModel:
+    physical_model: np.ndarray = None
+    transit_model: np.ndarray = None
+    eclipse_model: np.ndarray = None
+    line_model: np.ndarray = None
+    phase_curve_model: np.ndarray = None
 
 
 def add_cubicspline_to_phase_curve_model(
@@ -439,9 +449,14 @@ def compute_full_model_starry(
         physical_model_int = CubicSpline(times_local, physical_model)
         physical_model = physical_model_int(times)
 
-    if return_case == 'dict':
+    if return_case == 'dataclass':
+        return PhaseCurveModel(
+            physical_model=physical_model,
+            line_model=line_model,
+            phase_curve_model=starry_model
+        )
+    elif return_case == 'dict':
         return {
-            # output['line_model'] = line_model
             'physical_model': physical_model,
             'line_model': line_model,
             'phase_curve_model': starry_model
@@ -569,9 +584,16 @@ def compute_full_model_normal(
     if mutl_ecl:
         physical_model = physical_model*eclipse_model
 
-    if return_case == 'dict':
+    if return_case == 'dataclass':
+        return PhaseCurveModel(
+            physical_model=physical_model,
+            transit_model=transit_model,
+            eclipse_model=eclipse_model,
+            line_model=line_model,
+            phase_curve_model=phase_curve_model
+        )
+    elif return_case == 'dict':
         return {
-            # 'line_model': line_model,
             'physical_model': physical_model,
             'transit_model': transit_model,
             'eclipse_model': eclipse_model,
@@ -638,7 +660,7 @@ def process_weirdness(times, model_params):
 def residuals_func(
         model_params, times, xcenters, ycenters, fluxes, flux_errs,
         keep_inds, planet=None, star=None, system=None,
-        planet_info=None, knots=None, method=None, near_indicess=None,
+        planet_info=None, knots=None, method=None, near_indices=None,
         ind_kdtree=None, gw_kdtree=None, pld_intensities=None,
         x_bin_size=0.1, y_bin_size=0.1, transit_indices=None,
         include_transit=True, include_eclipse=True,
@@ -684,9 +706,9 @@ def residuals_func(
         ycenters=ycenters,
         residuals=residuals,
         knots=knots,
-        near_indicess=near_indicess,
-        xBinSize=x_bin_size,
-        yBinSize=y_bin_size,
+        near_indices=near_indices,
+        x_bin_size=x_bin_size,
+        y_bin_size=y_bin_size,
         ind_kdtree=ind_kdtree,
         gw_kdtree=gw_kdtree,
         pld_intensities=pld_intensities,
@@ -743,7 +765,7 @@ def residuals_func_multiepoch(
 
     for epoch, zippidy_day in enumerate(zippidy_do_dah):
         times, xcenters, ycenters, fluxes, flux_errs, keep_inds, knots, \
-            near_indicess, ind_kdtree, gw_kdtree, pld_intensities = zippidy_day
+            near_indices, ind_kdtree, gw_kdtree, pld_intensities = zippidy_day
 
         intercept_epoch = model_params_single[f'intercept{epoch}']
         slope_epoch = model_params_single[f'slope{epoch}']
@@ -763,7 +785,7 @@ def residuals_func_multiepoch(
             keep_inds,
             knots=knots,
             method=method,
-            near_indicess=near_indicess,
+            near_indices=near_indices,
             ind_kdtree=ind_kdtree,
             gw_kdtree=gw_kdtree,
             pld_intensities=pld_intensities,
@@ -808,7 +830,7 @@ def map_fit_params(fit_params, fit_param_names, model_params):
 def chisq_func_scipy(
         fit_params, fit_param_names, model_params, times,
         xcenters, ycenters, fluxes, flux_errs, knots, keep_inds,
-        method=None, near_indicess=None, ind_kdtree=None,
+        method=None, near_indices=None, ind_kdtree=None,
         gw_kdtree=None, pld_intensities=None, x_bin_size=0.1,
         y_bin_size=0.1, transit_indices=None,
         include_transit=True, include_eclipse=True,
@@ -833,7 +855,7 @@ def chisq_func_scipy(
         knots,
         keep_inds,
         method=method,
-        near_indicess=near_indicess,
+        near_indices=near_indices,
         ind_kdtree=ind_kdtree,
         gw_kdtree=gw_kdtree,
         pld_intensities=pld_intensities,
@@ -864,7 +886,7 @@ def generate_best_fit_solution(
         keep_inds,
         planet_info,
         method=None,
-        near_indicess=None,
+        near_indices=None,
         ind_kdtree=None,
         gw_kdtree=None,
         pld_intensities=None,
@@ -914,9 +936,9 @@ def generate_best_fit_solution(
         ycenters=ycenters,
         residuals=residuals,
         knots=knots,
-        near_indicess=near_indicess,
-        xBinSize=x_bin_size,
-        yBinSize=y_bin_size,
+        near_indices=near_indices,
+        x_bin_size=x_bin_size,
+        y_bin_size=y_bin_size,
         ind_kdtree=ind_kdtree,
         gw_kdtree=gw_kdtree,
         pld_intensities=pld_intensities,
@@ -941,7 +963,7 @@ def generate_best_fit_solution(
 def generate_best_fit_solution_scipy(
         fit_params, fit_param_names, model_params,
         times, xcenters, ycenters, fluxes, knots, keep_inds,
-        method=None, near_indicess=None, ind_kdtree=None,
+        method=None, near_indices=None, ind_kdtree=None,
         gw_kdtree=None, pld_intensities=None, x_bin_size=0.1,
         y_bin_size=0.1, transit_indices=None,
         include_transit=True, include_eclipse=True,
@@ -965,7 +987,7 @@ def generate_best_fit_solution_scipy(
         knots,
         keep_inds,
         method=method,
-        near_indicess=near_indicess,
+        near_indices=near_indices,
         ind_kdtree=ind_kdtree,
         gw_kdtree=gw_kdtree,
         pld_intensities=pld_intensities,
